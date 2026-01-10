@@ -38,7 +38,7 @@ nltk>=3.8.1
 
 # Language Detection
 langdetect>=1.0.9
-fasttext>=0.9.2
+#fasttext>=0.9.2
 
 # Advanced NLP
 flair>=0.13.0              # For advanced NER
@@ -108,17 +108,17 @@ telethon>=1.33.0
 # ----------------------------------------------------------------------------
 newsapi-python>=0.2.7      # NewsAPI client
 feedparser>=6.0.10         # RSS/Atom feed parser
-python-gnews>=0.3.7        # Google News scraper
+#python-gnews>=0.3.7        # Google News scraper
 
 # ----------------------------------------------------------------------------
 # FACT-CHECKING & VERIFICATION
 # ----------------------------------------------------------------------------
 
 # Claim Detection
-claimbuster>=0.1.0         # Claim detection (if available)
+#claimbuster>=0.1.0         # Claim detection (if available)
 
 # Google Fact Check Tools
-google-cloud-factcheck>=0.1.0  # Google Fact Check API (if available)
+#google-cloud-factcheck>=0.1.0  # Google Fact Check API (if available)
 
 # Web Search
 googlesearch-python>=1.2.3
