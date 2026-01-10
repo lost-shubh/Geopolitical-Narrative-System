@@ -624,9 +624,9 @@ If you use this system in your research, please cite:
 ```bibtex
 @software{geopolitical_narrative_system,
   title = {Geopolitical Narrative Intelligence System},
-  author = {Your Name},
+  author = Shubh Gupta,
   year = {2025},
-  url = {https://github.com/yourusername/geopolitical-narrative-system},
+  url = {https://github.com/lost-shubh/geopolitical-narrative-system},
   note = {An NLP-powered system for detecting and countering false geopolitical narratives}
 }
 ```
@@ -635,9 +635,9 @@ If you use this system in your research, please cite:
 
 ## 📞 Contact
 
-- **Project Lead:** [Your Name] - [your.email@example.com]
-- **GitHub:** [yourusername](https://github.com/yourusername)
-- **Issues:** [GitHub Issues](https://github.com/yourusername/geopolitical-narrative-system/issues)
+- **Project Lead:** Shubh Gupta - [shubh056888@gmail.com]
+- **GitHub:** [lost-shubh](https://github.com/lost-shubh)
+- **Issues:** [GitHub Issues](https://github.com/lost-shubh/geopolitical-narrative-system/issues)
 
 ---
 
