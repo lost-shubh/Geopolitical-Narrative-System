@@ -421,3 +421,7 @@ scratch.*
 #    git commit -m "Remove sensitive file"
 #
 # ============================================================================
+venv/
+__pycache__/
+*.pyc
+.env
