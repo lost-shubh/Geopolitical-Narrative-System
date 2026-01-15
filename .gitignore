@@ -1,54 +1,37 @@
-# ============================================================================
-# Geopolitical Narrative System - Git Ignore File
-# ============================================================================
+# =============================================================================
+# Geopolitical Narrative System - .gitignore (FINAL FIXED VERSION)
+# =============================================================================
 
-# ----------------------------------------------------------------------------
-# CRITICAL: API Keys & Secrets
-# ----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# SECRETS & ENVIRONMENT VARIABLES (NEVER COMMIT)
+# -----------------------------------------------------------------------------
 .env
-.env.local
-.env.*.local
-config/api_keys.yaml
-config/secrets.yaml
+.env.*
+!.env.example
+
 *.key
 *.pem
 credentials.json
 token.json
 
-# ----------------------------------------------------------------------------
-# Data Files (Can be Large)
-# ----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# DATA (RAW / GENERATED / SCRAPED — NEVER COMMIT)
+# -----------------------------------------------------------------------------
 data/raw/**
 data/processed/**
 data/external/**
+
+# Keep directory structure
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 !data/external/.gitkeep
 
-# Specific data file types
-*.csv
-*.json
-*.jsonl
-*.parquet
-*.feather
-*.pickle
-*.pkl
-*.h5
-*.hdf5
-*.db
-*.sqlite
-*.sqlite3
+# -----------------------------------------------------------------------------
+# MODEL ARTIFACTS & WEIGHTS (NEVER COMMIT)
+# -----------------------------------------------------------------------------
+src/models/**
+!src/models/.gitkeep
 
-# Exclude sample/test data (keep these)
-!data/raw/sample_news.json
-!data/raw/sample_comments.json
-!tests/fixtures/*.json
-
-# ----------------------------------------------------------------------------
-# Models & Weights (Large Files)
-# ----------------------------------------------------------------------------
-models/**
-!models/.gitkeep
 *.pt
 *.pth
 *.ckpt
@@ -59,191 +42,94 @@ models/**
 *.h5
 *.keras
 
-# Model cache directories
+# -----------------------------------------------------------------------------
+# CACHES (NLP / ML / VECTOR DB)
+# -----------------------------------------------------------------------------
 .cache/
-huggingface/
-transformers_cache/
+__cache__/
+api_cache/
 
-# ----------------------------------------------------------------------------
-# Python
-# ----------------------------------------------------------------------------
+# Hugging Face / Torch caches
+**/.cache/huggingface/
+**/.cache/torch/
 
-# Byte-compiled / optimized / DLL files
+# Vector databases
+chroma_db/
+faiss_index/
+
+# -----------------------------------------------------------------------------
+# PYTHON
+# -----------------------------------------------------------------------------
 __pycache__/
 *.py[cod]
-*$py.class
-
-# C extensions
 *.so
 
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-pip-wheel-metadata/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
 
-# PyInstaller
-*.manifest
-*.spec
+# -----------------------------------------------------------------------------
+# JUPYTER NOTEBOOKS
+# -----------------------------------------------------------------------------
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+notebooks/.ipynb_checkpoints/
 
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
+# Experimental notebooks (DO NOT COMMIT)
+notebooks/scratch/
+notebooks/experiments/
+notebooks/dev_*.ipynb
 
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
+# -----------------------------------------------------------------------------
+# LOGS & GENERATED OUTPUTS
+# -----------------------------------------------------------------------------
+logs/
+outputs/
+results/
+
+reports/*.pdf
+reports/*.html
+
+# -----------------------------------------------------------------------------
+# TESTING & COVERAGE
+# -----------------------------------------------------------------------------
 .coverage
 .coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
+htmlcov/
 .pytest_cache/
 test-results/
 test-reports/
 
-# Translations
-*.mo
-*.pot
+# -----------------------------------------------------------------------------
+# BUILD / PACKAGING
+# -----------------------------------------------------------------------------
+build/
+dist/
+*.egg-info/
+.eggs/
 
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-
-# Flask stuff:
-instance/
-.webassets-cache
-
-# Scrapy stuff:
-.scrapy
-
-# Sphinx documentation
-docs/_build/
-docs/_static/
-docs/_templates/
-
-# PyBuilder
-target/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-*/.ipynb_checkpoints/*
-notebooks/.ipynb_checkpoints/
-notebooks/*/.ipynb_checkpoints/
-
-# IPython
-profile_default/
-ipython_config.py
-
-# pyenv
-.python-version
-
-# pipenv
-Pipfile.lock
-
-# poetry
-poetry.lock
-
-# PEP 582
-__pypackages__/
-
-# Celery
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# ----------------------------------------------------------------------------
-# IDEs & Editors
-# ----------------------------------------------------------------------------
-
-# VSCode
+# -----------------------------------------------------------------------------
+# IDEs & EDITORS
+# -----------------------------------------------------------------------------
 .vscode/
-*.code-workspace
-.history/
-
-# PyCharm
 .idea/
 *.iml
 *.iws
 *.ipr
+.history/
 
-# Sublime Text
-*.sublime-project
-*.sublime-workspace
-
-# Vim
-*.swp
-*.swo
-*~
-.*.swp
-.*.swo
-
-# Emacs
-*~
-\#*\#
-.\#*
-
-# ----------------------------------------------------------------------------
-# Operating Systems
-# ----------------------------------------------------------------------------
-
+# -----------------------------------------------------------------------------
+# OPERATING SYSTEM FILES
+# -----------------------------------------------------------------------------
 # macOS
 .DS_Store
 .AppleDouble
 .LSOverride
 ._*
-.Spotlight-V100
-.Trashes
 
 # Windows
 Thumbs.db
@@ -255,173 +141,58 @@ $RECYCLE.BIN/
 # Linux
 .directory
 
-# ----------------------------------------------------------------------------
-# Logs & Temporary Files
-# ----------------------------------------------------------------------------
-logs/
-*.log
-*.log.*
+# -----------------------------------------------------------------------------
+# DOCKER / CLOUD / INFRA
+# -----------------------------------------------------------------------------
+.dockerignore
+docker-compose.override.yml
+
+.terraform/
+*.tfstate
+*.tfstate.backup
+
+.aws/
+.gcloud/
+.azure/
+
+# -----------------------------------------------------------------------------
+# DOCUMENTATION BUILD
+# -----------------------------------------------------------------------------
+docs/_build/
+docs/api/
+
+# -----------------------------------------------------------------------------
+# BACKUPS & TEMP FILES
+# -----------------------------------------------------------------------------
+*.bak
+*.backup
+*.old
 *.tmp
 *.temp
 tmp/
 temp/
 
-# ----------------------------------------------------------------------------
-# Database
-# ----------------------------------------------------------------------------
-*.db
-*.sqlite
-*.sqlite3
-*.sql
-postgresql_data/
-mysql_data/
-
-# ----------------------------------------------------------------------------
-# Backups
-# ----------------------------------------------------------------------------
-*.bak
-*.backup
-*.old
-*~
-
-# ----------------------------------------------------------------------------
-# Cloud & Deployment
-# ----------------------------------------------------------------------------
-.terraform/
-*.tfstate
-*.tfstate.backup
-.serverless/
-.aws/
-.gcloud/
-.azure/
-
-# ----------------------------------------------------------------------------
-# Docker
-# ----------------------------------------------------------------------------
-docker-compose.override.yml
-.dockerignore
-
-# ----------------------------------------------------------------------------
-# CI/CD
-# ----------------------------------------------------------------------------
-.github/workflows/*.local.yml
-
-# ----------------------------------------------------------------------------
-# Project Specific
-# ----------------------------------------------------------------------------
-
-# Scraped content (can be regenerated)
-scraped_data/
-crawl_cache/
-
-# Experimental notebooks (not for commit)
-notebooks/scratch/
-notebooks/experiments/
-notebooks/dev_*.ipynb
-
-# Large downloads
-downloads/
-archives/
-
-# Outputs (regenerable)
-outputs/
-results/
-reports/*.pdf
-reports/*.html
-
-# Cache directories
-cache/
-.cache/
-__cache__/
-
-# Temporary analysis files
-analysis_temp/
-viz_temp/
-
-# API response caches
-api_cache/
-.api_cache/
-
-# Vector database files (large)
-chroma_db/
-faiss_index/
-
-# ----------------------------------------------------------------------------
-# Documentation Build
-# ----------------------------------------------------------------------------
-docs/_build/
-docs/api/
-
-# ----------------------------------------------------------------------------
-# Research & Papers
-# ----------------------------------------------------------------------------
-papers/*.pdf
-research_papers/
-
-# ----------------------------------------------------------------------------
-# Misc
-# ----------------------------------------------------------------------------
-.env.example
-!.env.example
-TODO.local.md
-NOTES.local.md
-scratch.*
-
-# ============================================================================
-# WHAT TO COMMIT (Explicitly Include)
-# ============================================================================
-# These override the ignores above:
-
-# Keep directory structure
-!data/raw/.gitkeep
-!data/processed/.gitkeep
-!data/external/.gitkeep
-!models/.gitkeep
-!logs/.gitkeep
-
-# Keep sample/test files
-!tests/fixtures/
-!tests/fixtures/**
-
-# Keep documentation
-!docs/**/*.md
-!docs/**/*.rst
+# -----------------------------------------------------------------------------
+# EXPLICITLY KEEP (OVERRIDES)
+# -----------------------------------------------------------------------------
+!README.md
+!requirements.txt
+!.gitignore
 
 # Keep configuration templates
 !config/*.example.yaml
 !.env.example
 
-# Keep small test data
-!tests/data/
+# Keep documentation sources
+!docs/**/*.md
+!docs/**/*.rst
+
+# Keep tests and fixtures
+!tests/
+!tests/**
+!tests/fixtures/**
 !tests/data/**
 
-# ============================================================================
-# NOTES
-# ============================================================================
-#
-# 1. NEVER commit:
-#    - API keys, passwords, tokens
-#    - Raw scraped data (privacy concerns)
-#    - Large model weights
-#    - Personal information
-#
-# 2. ALWAYS commit:
-#    - Source code
-#    - Configuration templates
-#    - Documentation
-#    - Small test fixtures
-#    - Empty directory markers (.gitkeep)
-#
-# 3. To check what will be committed:
-#    git status
-#    git diff --cached
-#
-# 4. To remove accidentally committed files:
-#    git rm --cached <file>
-#    git commit -m "Remove sensitive file"
-#
-# ============================================================================
-#venv/
-#__pycache__/
-#*.pyc
-#.env
+# Keep directory markers
+!logs/.gitkeep
+!src/models/.gitkeep
