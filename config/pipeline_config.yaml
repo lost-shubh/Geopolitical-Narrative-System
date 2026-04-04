@@ -1,0 +1,7 @@
+topic: geopolitics OR international conflict OR diplomacy
+days_back: 3
+max_articles: 20
+use_existing_data: true
+offline_mode: true
+max_social_comments: 250
+default_tone: analytical

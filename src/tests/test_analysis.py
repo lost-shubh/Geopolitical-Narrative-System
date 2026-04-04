@@ -3,15 +3,15 @@ Test script for Stage 3 - Sentiment and Emotion Analysis
 Runs both analyzers on your fetched news articles.
 """
 
+import json
 import sys
 from pathlib import Path
-import json
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 
-from src.analysis.sentiment import SentimentAnalyzer, load_articles_from_json
 from src.analysis.emotion import EmotionAnalyzer
+from src.analysis.sentiment import SentimentAnalyzer, load_articles_from_json
 
 
 def print_header(text: str):

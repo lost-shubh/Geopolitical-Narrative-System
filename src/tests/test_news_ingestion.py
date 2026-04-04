@@ -9,10 +9,11 @@ from dotenv import load_dotenv
 import sys
 
 # Add src to path so we can import our modules
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 
-from ingestion.news_ingestor import NewsIngestor
-from utils.logger import setup_logger
+from src.ingestion.news_ingestor import NewsIngestor
+from src.utils.logger import setup_logger
 
 
 def main():
