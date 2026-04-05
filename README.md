@@ -6,6 +6,8 @@
 
 > An NLP-powered intelligence system for detecting, analyzing, and countering false geopolitical narratives through evidence-based fact verification and automated counter-narrative synthesis.
 
+**Live mode:** see [REALTIME.md](REALTIME.md) to run strict real-time news fetching and live dashboards.
+
 ---
 
 ## 📋 Table of Contents

@@ -35,6 +35,10 @@ class SentimentAnalyzer:
         "uncertain", "worse", "hostile", "disputed", "weapon", "casualty",
         "distrust", "concern", "alarming",
     }
+    UNCERTAINTY_WORDS = {
+        "uncertain", "developing", "reportedly", "may", "might", "could",
+        "risk", "volatile", "questions", "warning", "fragile", "tensions",
+    }
 
     def __init__(
         self,
@@ -89,10 +93,11 @@ class SentimentAnalyzer:
         if self.backend == "transformers" and self.model is not None:
             try:
                 result = self.model(text)[0]
-                return {
+                base_result = {
                     "label": result["label"],
                     "score": round(result["score"], 4)
                 }
+                return self._augment_transformer_result(base_result)
             except Exception as exc:
                 print(f"Error analyzing text with transformers: {exc}")
 
@@ -206,6 +211,9 @@ class SentimentAnalyzer:
         negative = sum(1 for item in sentiments if item["label"] == "NEGATIVE")
         neutral = len(sentiments) - positive - negative
         avg_score = sum(item["score"] for item in sentiments) / len(sentiments)
+        avg_positive = sum(float(item.get("positive_percent", 0.0)) for item in sentiments) / len(sentiments)
+        avg_negative = sum(float(item.get("negative_percent", 0.0)) for item in sentiments) / len(sentiments)
+        avg_neutral = sum(float(item.get("neutral_percent", 0.0)) for item in sentiments) / len(sentiments)
 
         return {
             "total_analyzed": len(sentiments),
@@ -215,7 +223,10 @@ class SentimentAnalyzer:
             "positive_percent": round(positive / len(sentiments) * 100, 2),
             "negative_percent": round(negative / len(sentiments) * 100, 2),
             "neutral_percent": round(neutral / len(sentiments) * 100, 2),
-            "average_confidence": round(avg_score, 4)
+            "average_confidence": round(avg_score, 4),
+            "average_positive_signal": round(avg_positive, 2),
+            "average_negative_signal": round(avg_negative, 2),
+            "average_neutral_signal": round(avg_neutral, 2),
         }
 
     def _analyze_text_heuristic(self, text: str) -> Dict[str, Union[str, float]]:
@@ -223,6 +234,7 @@ class SentimentAnalyzer:
         lowered = text.lower()
         positive_hits = sum(1 for word in self.POSITIVE_WORDS if word in lowered)
         negative_hits = sum(1 for word in self.NEGATIVE_WORDS if word in lowered)
+        uncertainty_hits = sum(1 for word in self.UNCERTAINTY_WORDS if word in lowered)
         delta = positive_hits - negative_hits
 
         if delta > 0:
@@ -234,7 +246,76 @@ class SentimentAnalyzer:
 
         magnitude = abs(delta)
         score = min(0.55 + magnitude * 0.12, 0.99) if magnitude else 0.5
-        return {"label": label, "score": round(score, 4)}
+        total_hits = positive_hits + negative_hits + uncertainty_hits
+
+        if total_hits == 0:
+            positive_percent = 20.0
+            negative_percent = 20.0
+            neutral_percent = 60.0
+        else:
+            positive_percent = round((positive_hits / total_hits) * 100, 2)
+            negative_percent = round((negative_hits / total_hits) * 100, 2)
+            neutral_percent = round((uncertainty_hits / total_hits) * 100, 2)
+            spillover = round(max(0.0, 100.0 - (positive_percent + negative_percent + neutral_percent)), 2)
+            neutral_percent = round(neutral_percent + spillover, 2)
+
+        intensity = round(min((max(total_hits, magnitude) / 4.0), 1.0), 4)
+        valence = round((positive_percent - negative_percent) / 100, 4)
+        deep_label = self._derive_deep_label(label=label, valence=valence, intensity=intensity, neutral_percent=neutral_percent)
+
+        return {
+            "label": label,
+            "score": round(score, 4),
+            "positive_percent": positive_percent,
+            "negative_percent": negative_percent,
+            "neutral_percent": neutral_percent,
+            "intensity": intensity,
+            "valence": valence,
+            "deep_label": deep_label,
+        }
+
+    def _augment_transformer_result(self, base_result: Dict[str, Union[str, float]]) -> Dict[str, Union[str, float]]:
+        """Derive richer sentiment structure from a transformer label/score pair."""
+        label = str(base_result.get("label", "NEUTRAL")).upper()
+        score = float(base_result.get("score", 0.5))
+
+        if label == "POSITIVE":
+            positive_percent = round(score * 100, 2)
+            negative_percent = round(max(0.0, (1 - score) * 35), 2)
+        elif label == "NEGATIVE":
+            negative_percent = round(score * 100, 2)
+            positive_percent = round(max(0.0, (1 - score) * 35), 2)
+        else:
+            positive_percent = 20.0
+            negative_percent = 20.0
+
+        neutral_percent = round(max(0.0, 100.0 - positive_percent - negative_percent), 2)
+        intensity = round(max(abs(positive_percent - negative_percent) / 100, score), 4)
+        valence = round((positive_percent - negative_percent) / 100, 4)
+        deep_label = self._derive_deep_label(label=label, valence=valence, intensity=intensity, neutral_percent=neutral_percent)
+
+        enriched = dict(base_result)
+        enriched.update(
+            {
+                "positive_percent": positive_percent,
+                "negative_percent": negative_percent,
+                "neutral_percent": neutral_percent,
+                "intensity": intensity,
+                "valence": valence,
+                "deep_label": deep_label,
+            }
+        )
+        return enriched
+
+    def _derive_deep_label(self, *, label: str, valence: float, intensity: float, neutral_percent: float) -> str:
+        """Convert simple sentiment into a deeper qualitative band."""
+        if neutral_percent >= 55 and intensity <= 0.55:
+            return "measured_neutral"
+        if label == "POSITIVE":
+            return "strongly_positive" if intensity >= 0.8 or valence >= 0.45 else "moderately_positive"
+        if label == "NEGATIVE":
+            return "strongly_negative" if intensity >= 0.8 or valence <= -0.45 else "moderately_negative"
+        return "mixed_or_cautious"
 
 
 def load_articles_from_json(filepath: str) -> List[Dict]:

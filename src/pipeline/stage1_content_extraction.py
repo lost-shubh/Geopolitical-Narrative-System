@@ -4,6 +4,8 @@ Stage 1: news ingestion plus basic content extraction.
 
 import argparse
 import json
+import logging
+import time
 from collections import Counter
 from pathlib import Path
 from typing import Dict, List
@@ -15,6 +17,8 @@ from src.preprocessing.clean_text import clean_article_fields
 from src.preprocessing.entity_extraction import EntityExtractor
 from src.preprocessing.language_detect import LanguageDetector
 from src.utils.api_clients import get_news_api_key, load_api_config, load_model_config, load_pipeline_config
+
+logger = logging.getLogger(__name__)
 
 TOPIC_KEYWORDS = {
     "ukraine_russia": {"ukraine", "russia", "europe", "pipeline"},
@@ -47,12 +51,15 @@ def _load_existing_articles(raw_file: Path) -> List[Dict]:
 def run_stage(
     *,
     query: str | None = None,
+    sources: str | None = None,
     days_back: int | None = None,
     max_articles: int | None = None,
     use_existing_data: bool | None = None,
     offline_mode: bool | None = None,
+    strict_live: bool | None = None,
 ) -> Dict:
     """Run Stage 1 and return processed article artifacts."""
+    started_at = time.perf_counter()
     load_dotenv()
     pipeline_config = load_pipeline_config()
     model_config = load_model_config()
@@ -63,6 +70,16 @@ def run_stage(
     max_articles = max_articles if max_articles is not None else pipeline_config["max_articles"]
     use_existing_data = pipeline_config["use_existing_data"] if use_existing_data is None else use_existing_data
     offline_mode = pipeline_config["offline_mode"] if offline_mode is None else offline_mode
+    strict_live = pipeline_config.get("realtime_only", False) if strict_live is None else strict_live
+
+    logger.info(
+        "Stage 1 starting | query=%s | strict_live=%s | use_existing_data=%s | offline_mode=%s | max_articles=%s",
+        query,
+        strict_live,
+        use_existing_data,
+        offline_mode,
+        max_articles,
+    )
 
     raw_dir = Path("data/raw/news")
     raw_dir.mkdir(parents=True, exist_ok=True)
@@ -71,29 +88,57 @@ def run_stage(
 
     articles: List[Dict] = []
 
-    if use_existing_data and raw_file.exists():
-        articles = _load_existing_articles(raw_file)
-    elif use_existing_data and fallback_file.exists():
-        raw_file = fallback_file
-        articles = _load_existing_articles(raw_file)
-    elif not offline_mode:
+    if strict_live:
+        if offline_mode:
+            raise RuntimeError("Stage 1 strict live mode cannot run with offline_mode=True.")
         api_key = get_news_api_key(api_config)
-        if api_key:
-            ingestor = NewsIngestor(api_key=api_key, data_dir=str(raw_dir))
-            fetched = ingestor.fetch_news(
-                query=query,
-                days_back=days_back,
-                max_articles=max_articles,
-            )
-            if fetched:
-                raw_path = ingestor.save_articles(fetched, raw_file.name)
-                raw_file = Path(raw_path)
-                articles = _load_existing_articles(raw_file)
-    if not articles and fallback_file.exists():
-        raw_file = fallback_file
+        if not api_key:
+            raise RuntimeError("Stage 1 strict live mode requires NEWS_API_KEY.")
+
+        ingestor = NewsIngestor(api_key=api_key, data_dir=str(raw_dir))
+        fetched = ingestor.fetch_news(
+            query=query,
+            sources=sources,
+            days_back=days_back,
+            max_articles=max_articles,
+        )
+        if not fetched:
+            logger.error("Strict live mode fetched 0 articles | query=%s", query)
+            raise RuntimeError("Strict live mode failed: 0 articles fetched")
+
+        logger.info("Strict live fetch returned %s articles | query=%s", len(fetched), query)
+        raw_path = ingestor.save_articles(fetched, raw_file.name)
+        raw_file = Path(raw_path)
         articles = _load_existing_articles(raw_file)
+    else:
+        if use_existing_data and raw_file.exists():
+            articles = _load_existing_articles(raw_file)
+        elif use_existing_data and fallback_file.exists():
+            raw_file = fallback_file
+            articles = _load_existing_articles(raw_file)
+        elif not offline_mode:
+            api_key = get_news_api_key(api_config)
+            if api_key:
+                ingestor = NewsIngestor(api_key=api_key, data_dir=str(raw_dir))
+                fetched = ingestor.fetch_news(
+                    query=query,
+                    sources=sources,
+                    days_back=days_back,
+                    max_articles=max_articles,
+                )
+                if fetched:
+                    raw_path = ingestor.save_articles(fetched, raw_file.name)
+                    raw_file = Path(raw_path)
+                    articles = _load_existing_articles(raw_file)
+                    logger.info("Fetched %s live articles for Stage 1 | query=%s", len(fetched), query)
+                else:
+                    logger.warning("Live fetch returned 0 articles in non-strict mode | query=%s", query)
+        if not articles and fallback_file.exists():
+            raw_file = fallback_file
+            articles = _load_existing_articles(raw_file)
 
     if not articles:
+        logger.error("Stage 1 ended with 0 articles | query=%s", query)
         raise RuntimeError("Stage 1 could not load any news articles.")
 
     entity_extractor = EntityExtractor(model_name=model_config["spacy_model"])
@@ -132,6 +177,15 @@ def run_stage(
             "articles": processed_articles,
         }, handle, indent=2, ensure_ascii=False)
 
+    duration_seconds = time.perf_counter() - started_at
+    logger.info(
+        "Stage 1 completed | query=%s | articles=%s | output=%s | duration=%.2fs",
+        query,
+        len(processed_articles),
+        output_file,
+        duration_seconds,
+    )
+
     return {
         "raw_news_file": str(raw_file),
         "processed_file": str(output_file),
@@ -145,25 +199,37 @@ def run_stage(
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run Stage 1 content extraction.")
     parser.add_argument("--query", help="News query override")
+    parser.add_argument("--sources", help="Comma-separated NewsAPI source IDs")
     parser.add_argument("--days", type=int, help="Days back to search")
     parser.add_argument("--max-articles", type=int, help="Maximum article count")
     parser.add_argument("--offline", action="store_true", help="Skip API calls and use local data only")
     parser.add_argument("--no-existing-data", action="store_true", help="Prefer fresh ingestion over local files")
+    parser.add_argument(
+        "--strict-live",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Require live NewsAPI data and disable local fallbacks",
+    )
     return parser
 
 
 def cli_main() -> Dict:
+    if not logging.getLogger().handlers:
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
+
     parser = build_parser()
     args = parser.parse_args()
     result = run_stage(
         query=args.query,
+        sources=args.sources,
         days_back=args.days,
         max_articles=args.max_articles,
         use_existing_data=not args.no_existing_data,
         offline_mode=args.offline,
+        strict_live=args.strict_live,
     )
-    print(f"Stage 1 complete. Processed {result['article_count']} articles.")
-    print(f"Saved to: {result['processed_file']}")
+    logger.info("Stage 1 complete. Processed %s articles.", result["article_count"])
+    logger.info("Saved to: %s", result["processed_file"])
     return result
 
 

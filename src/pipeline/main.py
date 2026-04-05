@@ -26,11 +26,15 @@ def run_pipeline(
     max_articles: int | None = None,
     use_existing_data: bool | None = None,
     offline_mode: bool | None = None,
+    strict_live: bool | None = None,
     tone: str | None = None,
 ) -> Dict:
     """Run the full five-stage pipeline."""
     load_dotenv()
     pipeline_config = load_pipeline_config()
+    if strict_live is None:
+        strict_live = False if offline_mode else pipeline_config.get("realtime_only", False)
+
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     database = PipelineDatabase()
 
@@ -40,6 +44,7 @@ def run_pipeline(
         max_articles=max_articles,
         use_existing_data=use_existing_data,
         offline_mode=offline_mode,
+        strict_live=strict_live,
     )
     database.record_stage(run_id, "stage1", "completed", {"processed_file": stage1_result["processed_file"]})
 
@@ -96,18 +101,29 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-articles", type=int, help="Maximum article count")
     parser.add_argument("--offline", action="store_true", help="Use only local project data")
     parser.add_argument("--no-existing-data", action="store_true", help="Prefer fresh ingestion over existing files")
+    parser.add_argument("--strict-live", action="store_true", help="Require live NewsAPI fetch for Stage 1")
+    parser.add_argument("--no-strict-live", action="store_true", help="Disable strict live mode")
     parser.add_argument("--tone", choices=["analytical", "public", "policy"], help="Narrative tone")
     return parser
 
 
 def cli_main() -> Dict:
     args = build_parser().parse_args()
+    strict_live = None
+    if args.strict_live and args.no_strict_live:
+        raise SystemExit("Choose only one of --strict-live or --no-strict-live.")
+    if args.strict_live:
+        strict_live = True
+    elif args.no_strict_live:
+        strict_live = False
+
     result = run_pipeline(
         topic=args.topic,
         days_back=args.days,
         max_articles=args.max_articles,
         use_existing_data=not args.no_existing_data,
         offline_mode=args.offline,
+        strict_live=strict_live,
         tone=args.tone,
     )
     print("=" * 70)

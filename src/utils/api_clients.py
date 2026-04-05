@@ -12,9 +12,12 @@ import yaml
 DEFAULT_PIPELINE_CONFIG = {
     "topic": "geopolitics OR international conflict OR diplomacy",
     "days_back": 3,
-    "max_articles": 20,
-    "use_existing_data": True,
-    "offline_mode": True,
+    "max_articles": 60,
+    "use_existing_data": False,
+    "offline_mode": False,
+    "realtime_only": True,
+    "poll_interval_seconds": 60,
+    "realtime_max_headlines": 18,
     "max_social_comments": 250,
     "default_tone": "analytical",
 }
@@ -23,12 +26,13 @@ DEFAULT_MODEL_CONFIG = {
     "sentiment_model": "distilbert-base-uncased-finetuned-sst-2-english",
     "emotion_model": "j-hartmann/emotion-english-distilroberta-base",
     "spacy_model": "en_core_web_sm",
-    "prefer_transformers": False,
+    "prefer_transformers": True,
 }
 
 DEFAULT_API_KEYS_CONFIG = {
     "news_api_env": "NEWS_API_KEY",
     "news_api_key": "",
+    "require_news_api_key": True,
 }
 
 

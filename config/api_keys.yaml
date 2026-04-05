@@ -1,2 +1,3 @@
 news_api_env: NEWS_API_KEY
 news_api_key: ""
+require_news_api_key: true
