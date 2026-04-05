@@ -1,0 +1,16 @@
+{
+  "name": "GNS Codespace",
+  "image": "mcr.microsoft.com/devcontainers/python:1-3.11-bullseye",
+  "postCreateCommand": "bash -lc 'python -m venv .venv && source .venv/bin/activate && pip install --upgrade pip && pip install -r requirements-codespaces.txt'",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/workspaces/${localWorkspaceFolderBasename}/.venv/bin/python",
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  },
+  "forwardPorts": [
+    8501
+  ]
+}

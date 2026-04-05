@@ -10,6 +10,12 @@ Create `.env` in project root:
 NEWS_API_KEY=your_newsapi_key
 ```
 
+For GitHub Codespaces, do not put only the raw key in the file. It must be exactly:
+
+```bash
+echo 'NEWS_API_KEY=your_newsapi_key' > .env
+```
+
 ## 2) Run live monitor (terminal dashboard)
 
 ```powershell
@@ -43,3 +49,29 @@ The dashboard auto-refreshes and reads the latest snapshot from the live monitor
 - `config/pipeline_config.yaml` defaults to real-time mode (`realtime_only: true`).
 - Stage 1 strict live mode requires `NEWS_API_KEY`.
 - Stage 2 now derives reaction rows from live article text (news-only pipeline, no mock social dataset).
+
+## GitHub Codespaces
+
+Codespaces is Linux, so Windows commands like `.\venv\Scripts\python.exe` will not work there.
+
+Use:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements-codespaces.txt
+echo 'NEWS_API_KEY=your_newsapi_key' > .env
+python run_realtime.py --query "geopolitics" --interval 60
+```
+
+To run the dashboard in Codespaces:
+
+```bash
+source .venv/bin/activate
+streamlit run src/realtime/dashboard.py --server.address 0.0.0.0 --server.port 8501
+```
+
+Open forwarded port `8501` in the Codespaces UI.
+
+If you rebuild the Codespace after this commit, `.devcontainer/devcontainer.json` will provision Python 3.11 and install `requirements-codespaces.txt` automatically.
