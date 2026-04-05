@@ -270,6 +270,14 @@ def test_news_ingestor_filters_irrelevant_articles():
     assert filtered[0]["url"] == "https://example.test/iran-talks"
 
 
+def test_news_ingestor_normalizes_broad_top_headline_query_to_empty():
+    ingestor = news_ingestor.NewsIngestor(api_key="test-key")
+
+    assert ingestor._normalize_top_headlines_query("geopolitics") == ""
+    assert ingestor._normalize_top_headlines_query("foreign policy") == ""
+    assert ingestor._normalize_top_headlines_query("iran OR israel") == "iran OR israel"
+
+
 def test_run_realtime_parser_accepts_bare_interval_flag():
     parser = run_realtime.build_parser()
     args = parser.parse_args(["--query", "geopolitics", "--interval"])

@@ -103,7 +103,12 @@ def run_stage(
             max_articles=max_articles,
         )
         if not fetched:
-            logger.error("Strict live mode fetched 0 articles | query=%s", query)
+            failure_reason = getattr(ingestor, "last_failure_reason", "")
+            logger.error(
+                "Strict live mode fetched 0 articles | query=%s | reason=%s",
+                query,
+                failure_reason or "no matching live articles returned",
+            )
             raise RuntimeError("Strict live mode failed: 0 articles fetched")
 
         logger.info("Strict live fetch returned %s articles | query=%s", len(fetched), query)

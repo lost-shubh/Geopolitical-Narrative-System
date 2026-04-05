@@ -24,6 +24,7 @@ class NewsIngestor:
     MAX_RETRIES = 3
     REQUEST_TIMEOUT_SECONDS = 10
     BASE_BACKOFF_SECONDS = 1.0
+    TOP_HEADLINE_COUNTRIES = ["us", "gb", "in", "au", "ca"]
     GLOBAL_NEWS_DOMAINS = [
         "reuters.com",
         "apnews.com",
@@ -87,6 +88,8 @@ class NewsIngestor:
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.base_url = "https://newsapi.org/v2/everything"
+        self.top_headlines_url = "https://newsapi.org/v2/top-headlines"
+        self.last_failure_reason = ""
 
     def fetch_news(
         self,
@@ -118,6 +121,7 @@ class NewsIngestor:
         )
 
         max_articles = max(1, int(max_articles))
+        self.last_failure_reason = ""
 
         if sources:
             aggregated = self._fetch_single_profile(
@@ -130,6 +134,20 @@ class NewsIngestor:
                 domains=domains,
             )
         else:
+            aggregated = self._fetch_top_headlines(
+                query=query,
+                language=language,
+                max_articles=max_articles,
+            )
+            unique_articles = self._finalize_articles(aggregated, query=query, max_articles=max_articles)
+            if unique_articles:
+                logger.info(
+                    "Fetched %s unique articles from top-headlines path | query=%s",
+                    len(unique_articles),
+                    query,
+                )
+                return unique_articles
+
             domain_batches = self._build_domain_batches(domains)
             query_profiles = self._build_query_profiles(query)
             aggregated = self._fetch_across_global_profiles(
@@ -142,9 +160,9 @@ class NewsIngestor:
                 max_articles=max_articles,
             )
 
-        deduped = self._dedupe_articles(aggregated)
-        filtered = self._filter_relevant_articles(deduped, query=query)
-        unique_articles = filtered[:max_articles]
+        unique_articles = self._finalize_articles(aggregated, query=query, max_articles=max_articles)
+        if not unique_articles and self.last_failure_reason:
+            logger.error("News fetch produced 0 articles | query=%s | reason=%s", query, self.last_failure_reason)
         logger.info("Fetched %s unique articles after dedup | query=%s", len(unique_articles), query)
         return unique_articles
 
@@ -259,6 +277,11 @@ class NewsIngestor:
         unique.sort(key=sort_key, reverse=True)
         return unique
 
+    def _finalize_articles(self, articles: List[Dict], *, query: str, max_articles: int) -> List[Dict]:
+        deduped = self._dedupe_articles(articles)
+        filtered = self._filter_relevant_articles(deduped, query=query)
+        return filtered[:max_articles]
+
     def _build_query_profiles(self, query: str) -> List[str]:
         """Expand broad geopolitical queries into multiple topical profiles."""
         lowered = query.lower().strip()
@@ -320,6 +343,75 @@ class NewsIngestor:
 
         return aggregated
 
+    def _fetch_top_headlines(
+        self,
+        *,
+        query: str,
+        language: str,
+        max_articles: int,
+    ) -> List[Dict]:
+        """Fetch live top headlines across several countries with low request volume."""
+        aggregated: List[Dict] = []
+        page_size = min(max(max_articles, 20), 100)
+        query_term = self._normalize_top_headlines_query(query)
+
+        logger.info(
+            "Fetching top-headlines fallback | query=%s | normalized_query=%s | max_articles=%s",
+            query,
+            query_term or "",
+            max_articles,
+        )
+
+        for country in self.TOP_HEADLINE_COUNTRIES:
+            params = {
+                "country": country,
+                "pageSize": page_size,
+                "page": 1,
+                "apiKey": self.api_key,
+            }
+            if query_term:
+                params["q"] = query_term
+
+            payload = self._request_json_with_retries(
+                url=self.top_headlines_url,
+                params=params,
+                request_name="top-headlines",
+                query=query,
+                page=1,
+                context=country,
+            )
+            if payload is None:
+                continue
+
+            if payload.get("status") != "ok":
+                self.last_failure_reason = payload.get("message", "NewsAPI top-headlines returned non-ok status")
+                logger.error(
+                    "Top-headlines logical error | query=%s | country=%s | message=%s",
+                    query,
+                    country,
+                    self.last_failure_reason,
+                )
+                continue
+
+            page_articles = payload.get("articles", [])
+            if not page_articles:
+                logger.warning("Top-headlines returned 0 articles | query=%s | country=%s", query, country)
+                continue
+
+            aggregated.extend(page_articles)
+            current_candidates = self._finalize_articles(aggregated, query=query, max_articles=max_articles)
+            logger.info(
+                "Top-headlines received | query=%s | country=%s | page_articles=%s | relevant_accumulated=%s",
+                query,
+                country,
+                len(page_articles),
+                len(current_candidates),
+            )
+            if len(current_candidates) >= max_articles:
+                break
+
+        return aggregated
+
     def _fetch_single_profile(
         self,
         *,
@@ -369,11 +461,12 @@ class NewsIngestor:
                     break
 
                 if payload.get("status") != "ok":
+                    self.last_failure_reason = payload.get("message", "NewsAPI everything returned non-ok status")
                     logger.error(
                         "NewsAPI logical error | query=%s | page=%s | message=%s",
                         query,
                         page,
-                        payload.get("message", "Unknown error"),
+                        self.last_failure_reason,
                     )
                     break
 
@@ -445,14 +538,35 @@ class NewsIngestor:
 
     def _fetch_page_with_retries(self, *, params: Dict, query: str, page: int) -> Optional[Dict]:
         """Fetch one NewsAPI page with retries and exponential backoff."""
+        return self._request_json_with_retries(
+            url=self.base_url,
+            params=params,
+            request_name="everything",
+            query=query,
+            page=page,
+        )
+
+    def _request_json_with_retries(
+        self,
+        *,
+        url: str,
+        params: Dict,
+        request_name: str,
+        query: str,
+        page: int,
+        context: str = "",
+    ) -> Optional[Dict]:
+        """Fetch one NewsAPI JSON payload with retries and exponential backoff."""
         backoff = self.BASE_BACKOFF_SECONDS
 
         for attempt in range(1, self.MAX_RETRIES + 1):
             try:
-                response = requests.get(self.base_url, params=params, timeout=self.REQUEST_TIMEOUT_SECONDS)
+                response = requests.get(url, params=params, timeout=self.REQUEST_TIMEOUT_SECONDS)
                 logger.info(
-                    "NewsAPI response | query=%s | page=%s | attempt=%s | status_code=%s",
+                    "NewsAPI response | request=%s | query=%s | context=%s | page=%s | attempt=%s | status_code=%s",
+                    request_name,
                     query,
+                    context,
                     page,
                     attempt,
                     response.status_code,
@@ -460,18 +574,24 @@ class NewsIngestor:
                 response.raise_for_status()
                 return response.json()
             except requests.exceptions.Timeout as exc:
+                self.last_failure_reason = f"{request_name} timeout"
                 logger.warning(
-                    "NewsAPI timeout | query=%s | page=%s | attempt=%s/%s | error=%s",
+                    "NewsAPI timeout | request=%s | query=%s | context=%s | page=%s | attempt=%s/%s | error=%s",
+                    request_name,
                     query,
+                    context,
                     page,
                     attempt,
                     self.MAX_RETRIES,
                     self._sanitize_error_message(exc),
                 )
             except requests.exceptions.ConnectionError as exc:
+                self.last_failure_reason = f"{request_name} connection error"
                 logger.warning(
-                    "NewsAPI connection error | query=%s | page=%s | attempt=%s/%s | error=%s",
+                    "NewsAPI connection error | request=%s | query=%s | context=%s | page=%s | attempt=%s/%s | error=%s",
+                    request_name,
                     query,
+                    context,
                     page,
                     attempt,
                     self.MAX_RETRIES,
@@ -479,10 +599,13 @@ class NewsIngestor:
                 )
             except requests.exceptions.HTTPError as exc:
                 status_code = exc.response.status_code if exc.response is not None else None
+                self.last_failure_reason = f"{request_name} HTTP {status_code}" if status_code else f"{request_name} HTTP error"
                 if status_code and status_code >= 500:
                     logger.warning(
-                        "NewsAPI HTTP server error | query=%s | page=%s | attempt=%s/%s | status_code=%s",
+                        "NewsAPI HTTP server error | request=%s | query=%s | context=%s | page=%s | attempt=%s/%s | status_code=%s",
+                        request_name,
                         query,
+                        context,
                         page,
                         attempt,
                         self.MAX_RETRIES,
@@ -490,17 +613,22 @@ class NewsIngestor:
                     )
                 else:
                     logger.error(
-                        "NewsAPI HTTP client error | query=%s | page=%s | attempt=%s | status_code=%s",
+                        "NewsAPI HTTP client error | request=%s | query=%s | context=%s | page=%s | attempt=%s | status_code=%s",
+                        request_name,
                         query,
+                        context,
                         page,
                         attempt,
                         status_code,
                     )
                     return None
             except requests.exceptions.RequestException as exc:
+                self.last_failure_reason = f"{request_name} request exception"
                 logger.error(
-                    "NewsAPI request exception | query=%s | page=%s | attempt=%s/%s | error=%s",
+                    "NewsAPI request exception | request=%s | query=%s | context=%s | page=%s | attempt=%s/%s | error=%s",
+                    request_name,
                     query,
+                    context,
                     page,
                     attempt,
                     self.MAX_RETRIES,
@@ -509,8 +637,10 @@ class NewsIngestor:
 
             if attempt < self.MAX_RETRIES:
                 logger.warning(
-                    "Retrying NewsAPI request | query=%s | page=%s | next_attempt=%s | backoff=%.1fs",
+                    "Retrying NewsAPI request | request=%s | query=%s | context=%s | page=%s | next_attempt=%s | backoff=%.1fs",
+                    request_name,
                     query,
+                    context,
                     page,
                     attempt + 1,
                     backoff,
@@ -519,6 +649,20 @@ class NewsIngestor:
                 backoff *= 2
 
         return None
+
+    def _normalize_top_headlines_query(self, query: str) -> str:
+        """Map broad live-monitor queries to concrete top-headline keywords."""
+        lowered = (query or "").strip().lower()
+        if not lowered:
+            return ""
+
+        broad_markers = {"geopolitics", "international", "foreign policy", "global security", "diplomacy"}
+        if any(marker in lowered for marker in broad_markers):
+            return ""
+
+        tokens = [token.strip() for token in re.split(r"\bor\b|\band\b|[,\s]+", lowered) if token.strip()]
+        filtered_tokens = [token for token in tokens if len(token) > 2 and token not in {"the", "and", "for"}]
+        return " OR ".join(filtered_tokens[:4])
 
     def _sanitize_error_message(self, error: Exception | str) -> str:
         """Redact secrets from request/response error text before logging."""
