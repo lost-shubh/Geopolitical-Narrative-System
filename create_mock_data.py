@@ -8,6 +8,11 @@ import random
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from src.utils.console import configure_console_output
+
+
+configure_console_output()
+
 
 # Sample realistic comments about geopolitical topics
 COMMENT_TEMPLATES = {

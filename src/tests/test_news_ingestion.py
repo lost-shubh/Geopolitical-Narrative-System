@@ -12,8 +12,11 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
+from src.utils.console import configure_console_output
 from src.ingestion.news_ingestor import NewsIngestor
 from src.utils.logger import setup_logger
+
+configure_console_output()
 
 
 def main():

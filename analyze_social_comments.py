@@ -10,9 +10,12 @@ import json
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
+from utils.console import configure_console_output
 from analysis.sentiment import SentimentAnalyzer
 from analysis.emotion import EmotionAnalyzer
 from tqdm import tqdm
+
+configure_console_output()
 
 
 def load_comments(filepath: str):

@@ -19,6 +19,15 @@ from src.utils.api_clients import load_pipeline_config
 from src.utils.database import PipelineDatabase
 
 
+def _print_live_section(title: str, lines: list[str]) -> None:
+    """Print a compact live status block to stdout."""
+    print("\n" + "=" * 70)
+    print(title)
+    print("=" * 70)
+    for line in lines:
+        print(line)
+
+
 def run_pipeline(
     *,
     topic: str | None = None,
@@ -28,6 +37,7 @@ def run_pipeline(
     offline_mode: bool | None = None,
     strict_live: bool | None = None,
     tone: str | None = None,
+    live_output: bool = False,
 ) -> Dict:
     """Run the full five-stage pipeline."""
     load_dotenv()
@@ -47,18 +57,51 @@ def run_pipeline(
         strict_live=strict_live,
     )
     database.record_stage(run_id, "stage1", "completed", {"processed_file": stage1_result["processed_file"]})
+    if live_output:
+        _print_live_section("STAGE 1 COMPLETE", [
+            f"Articles processed: {stage1_result['article_count']}",
+            f"Topics: {stage1_result['topic_distribution']}",
+            f"Saved: {stage1_result['processed_file']}",
+        ])
 
     stage2_result = run_stage2(stage1_result=stage1_result)
     database.record_stage(run_id, "stage2", "completed", {"processed_file": stage2_result["processed_file"]})
+    if live_output:
+        _print_live_section("STAGE 2 COMPLETE", [
+            f"Comments collected: {stage2_result['comment_count']}",
+            f"Platforms: {stage2_result['platform_distribution']}",
+            f"Saved: {stage2_result['processed_file']}",
+        ])
 
     stage3_result = run_stage3(stage1_result=stage1_result, stage2_result=stage2_result)
     database.record_stage(run_id, "stage3", "completed", {"news_file": stage3_result["news_file"], "social_file": stage3_result["social_file"]})
+    if live_output:
+        news_stats = stage3_result["news_results"]["sentiment_statistics"]
+        social_stats = stage3_result["social_results"]
+        _print_live_section("STAGE 3 COMPLETE", [
+            f"News articles analyzed: {news_stats['total_analyzed']}",
+            f"News negative: {news_stats['negative_percent']}%",
+            f"Comments analyzed: {social_stats['total_comments']}",
+            f"Polarization: {social_stats['polarization']['level']} ({social_stats['polarization']['score']})",
+        ])
 
     stage4_result = run_stage4(stage1_result=stage1_result)
     database.record_stage(run_id, "stage4", "completed", {"verified_file": stage4_result["verified_file"]})
+    if live_output:
+        verification = stage4_result["verified_payload"]["statistics"]
+        _print_live_section("STAGE 4 COMPLETE", [
+            f"Claims verified: {verification['total_verified']}",
+            f"Average credibility: {verification['average_credibility']}",
+            f"Disputed claims: {verification['disputed_count']}",
+        ])
 
     stage5_result = run_stage5(stage4_result=stage4_result, stage3_result=stage3_result, tone=tone)
     database.record_stage(run_id, "stage5", "completed", {"report_file": stage5_result["final_report"]})
+    if live_output:
+        _print_live_section("STAGE 5 COMPLETE", [
+            f"Narratives generated: {len(stage5_result['narratives'])}",
+            f"Final report: {stage5_result['final_report']}",
+        ])
 
     output_dir = Path("data/processed/pipeline_results")
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -91,6 +134,16 @@ def run_pipeline(
         json.dump(summary, handle, indent=2, ensure_ascii=False)
 
     summary["summary_file"] = str(summary_file)
+
+    if live_output:
+        final_report_path = Path(stage5_result["final_report"])
+        if final_report_path.exists():
+            print("\n" + "=" * 70)
+            print("FINAL REPORT")
+            print("=" * 70)
+            with open(final_report_path, "r", encoding="utf-8") as handle:
+                print(handle.read())
+
     return summary
 
 
@@ -100,10 +153,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--days", type=int, help="Days back to search")
     parser.add_argument("--max-articles", type=int, help="Maximum article count")
     parser.add_argument("--offline", action="store_true", help="Use only local project data")
-    parser.add_argument("--no-existing-data", action="store_true", help="Prefer fresh ingestion over existing files")
+    parser.add_argument(
+        "--use-existing-data",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Use cached news data when available; defaults to config value when omitted",
+    )
     parser.add_argument("--strict-live", action="store_true", help="Require live NewsAPI fetch for Stage 1")
     parser.add_argument("--no-strict-live", action="store_true", help="Disable strict live mode")
     parser.add_argument("--tone", choices=["analytical", "public", "policy"], help="Narrative tone")
+    parser.add_argument("--live", action="store_true", help="Print stage summaries and the final report in the terminal")
     return parser
 
 
@@ -121,10 +180,11 @@ def cli_main() -> Dict:
         topic=args.topic,
         days_back=args.days,
         max_articles=args.max_articles,
-        use_existing_data=not args.no_existing_data,
+        use_existing_data=args.use_existing_data,
         offline_mode=args.offline,
         strict_live=strict_live,
         tone=args.tone,
+        live_output=args.live,
     )
     print("=" * 70)
     print("PIPELINE COMPLETE")

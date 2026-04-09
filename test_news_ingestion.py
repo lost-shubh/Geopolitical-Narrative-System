@@ -11,8 +11,11 @@ import sys
 # Add src to path so we can import our modules
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
+from utils.console import configure_console_output
 from ingestion.news_ingestor import NewsIngestor
 from utils.logger import setup_logger
+
+configure_console_output()
 
 
 def main():

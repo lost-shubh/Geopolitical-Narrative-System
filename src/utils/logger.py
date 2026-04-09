@@ -9,6 +9,8 @@ from pathlib import Path
 from datetime import datetime
 from typing import Optional
 
+from .console import configure_console_output
+
 
 def setup_logger(
     name: str = "geopolitical_narrative",
@@ -28,6 +30,8 @@ def setup_logger(
     Returns:
         Configured logger instance
     """
+    configure_console_output()
+
     # Create logs directory
     log_path = Path(log_dir)
     log_path.mkdir(parents=True, exist_ok=True)

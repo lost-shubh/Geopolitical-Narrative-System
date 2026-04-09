@@ -61,12 +61,14 @@ class SentimentAnalyzer:
 
         if self.prefer_transformers and pipeline is not None:
             try:
+                os.environ.setdefault("DISABLE_SAFETENSORS_CONVERSION", "1")
                 print(f"Loading sentiment model: {model_name}")
                 print("(Using transformer backend)")
                 self.model = pipeline(
                     "sentiment-analysis",
                     model=model_name,
                     device=-1,
+                    use_safetensors=False,
                 )
                 self.backend = "transformers"
                 print("Sentiment model loaded successfully")

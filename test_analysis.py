@@ -10,8 +10,11 @@ import json
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
+from utils.console import configure_console_output
 from analysis.sentiment import SentimentAnalyzer, load_articles_from_json
 from analysis.emotion import EmotionAnalyzer
+
+configure_console_output()
 
 
 def print_header(text: str):

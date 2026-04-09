@@ -10,8 +10,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
+from src.utils.console import configure_console_output
 from src.analysis.emotion import EmotionAnalyzer
 from src.analysis.sentiment import SentimentAnalyzer, load_articles_from_json
+
+configure_console_output()
 
 
 def print_header(text: str):

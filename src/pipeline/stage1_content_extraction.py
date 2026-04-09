@@ -109,7 +109,11 @@ def run_stage(
                 query,
                 failure_reason or "no matching live articles returned",
             )
-            raise RuntimeError("Strict live mode failed: 0 articles fetched")
+            detail = f" ({failure_reason})" if failure_reason else ""
+            raise RuntimeError(
+                "Strict live mode failed: 0 articles fetched"
+                f"{detail}. Retry later, use --no-strict-live for local fallback, or use --offline for local-only mode."
+            )
 
         logger.info("Strict live fetch returned %s articles | query=%s", len(fetched), query)
         raw_path = ingestor.save_articles(fetched, raw_file.name)
@@ -208,7 +212,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--days", type=int, help="Days back to search")
     parser.add_argument("--max-articles", type=int, help="Maximum article count")
     parser.add_argument("--offline", action="store_true", help="Skip API calls and use local data only")
-    parser.add_argument("--no-existing-data", action="store_true", help="Prefer fresh ingestion over local files")
+    parser.add_argument(
+        "--use-existing-data",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Use cached news data when available; defaults to config value when omitted",
+    )
     parser.add_argument(
         "--strict-live",
         action=argparse.BooleanOptionalAction,
@@ -229,7 +238,7 @@ def cli_main() -> Dict:
         sources=args.sources,
         days_back=args.days,
         max_articles=args.max_articles,
-        use_existing_data=not args.no_existing_data,
+        use_existing_data=args.use_existing_data,
         offline_mode=args.offline,
         strict_live=args.strict_live,
     )

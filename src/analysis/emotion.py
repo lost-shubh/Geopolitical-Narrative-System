@@ -59,6 +59,7 @@ class EmotionAnalyzer:
 
         if self.prefer_transformers and pipeline is not None:
             try:
+                os.environ.setdefault("DISABLE_SAFETENSORS_CONVERSION", "1")
                 print(f"Loading emotion model: {model_name}")
                 print("(Using transformer backend)")
                 self.model = pipeline(
@@ -66,6 +67,7 @@ class EmotionAnalyzer:
                     model=model_name,
                     top_k=None,
                     device=-1,
+                    use_safetensors=False,
                 )
                 self.backend = "transformers"
                 print("Emotion model loaded successfully")

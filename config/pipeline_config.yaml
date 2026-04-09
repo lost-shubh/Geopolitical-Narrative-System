@@ -3,7 +3,7 @@ days_back: 3
 max_articles: 60
 use_existing_data: false
 offline_mode: false
-realtime_only: true
+realtime_only: false
 poll_interval_seconds: 60
 realtime_max_headlines: 18
 max_social_comments: 250

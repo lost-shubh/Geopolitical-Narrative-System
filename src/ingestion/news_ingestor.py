@@ -527,9 +527,9 @@ class NewsIngestor:
     def _is_relevant_article(self, article: Dict, relevance_terms: set[str]) -> bool:
         text = " ".join(
             [
-                article.get("title", ""),
-                article.get("description", ""),
-                article.get("content", ""),
+                str(article.get("title") or ""),
+                str(article.get("description") or ""),
+                str(article.get("content") or ""),
             ]
         ).lower()
         if not text.strip():

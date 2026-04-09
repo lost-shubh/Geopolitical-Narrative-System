@@ -9,6 +9,7 @@ import pytest
 import requests
 
 import src.ingestion.news_ingestor as news_ingestor
+import src.pipeline.main as pipeline_main
 import src.pipeline.stage1_content_extraction as stage1
 import run_realtime
 from src.pipeline.stage2_reaction_analysis import run_stage as run_stage2
@@ -29,7 +30,7 @@ def test_stage1_strict_live_requires_api_key(monkeypatch):
         )
 
 
-def test_stage1_strict_live_fetches_and_processes_articles(monkeypatch):
+def test_stage1_strict_live_fetches_and_processes_articles(monkeypatch, tmp_path):
     sample_articles = [
         {
             "title": "NATO leaders meet in Brussels",
@@ -75,6 +76,7 @@ def test_stage1_strict_live_fetches_and_processes_articles(monkeypatch):
 
     monkeypatch.setattr(stage1, "get_news_api_key", lambda _cfg=None: "test-key")
     monkeypatch.setattr(stage1, "NewsIngestor", FakeNewsIngestor)
+    monkeypatch.chdir(tmp_path)
 
     result = stage1.run_stage(
         query="nato",
@@ -88,6 +90,13 @@ def test_stage1_strict_live_fetches_and_processes_articles(monkeypatch):
     assert result["article_count"] == 1
     assert result["articles"][0]["title"] == "NATO leaders meet in Brussels"
     assert Path(result["processed_file"]).exists()
+
+
+def test_run_pipeline_parser_defaults_use_existing_data_to_config():
+    parser = pipeline_main.build_parser()
+    args = parser.parse_args([])
+
+    assert args.use_existing_data is None
 
 
 def test_stage2_builds_reactions_from_news_articles():
