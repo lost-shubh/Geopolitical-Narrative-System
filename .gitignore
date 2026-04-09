@@ -200,3 +200,4 @@ temp/
 # Keep directory markers
 !logs/.gitkeep
 !src/models/.gitkeep
+.vercel
