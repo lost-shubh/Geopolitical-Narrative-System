@@ -1,0 +1,31 @@
+import type { LiveSnapshot } from "@/src/lib/types";
+
+export const mockSnapshot: LiveSnapshot = {
+  schema_version: 1,
+  status: "degraded",
+  generated_at: "2026-04-09T00:00:00Z",
+  published_at: "2026-04-09T00:00:00Z",
+  last_updated: "2026-04-09T00:00:00Z",
+  cycle: 1,
+  query: "geopolitics",
+  articles_count: 0,
+  article_count: 0,
+  fetched_articles_count: 0,
+  new_articles_count: 0,
+  seen_articles_skipped: 0,
+  message: "No published Blob snapshot exists yet. Trigger the GitHub Actions workflow to publish the first one.",
+  error: "Waiting for the first live snapshot upload.",
+  sentiment_distribution: {},
+  deep_sentiment_distribution: {},
+  deep_sentiment_summary: {
+    average_positive_signal: 0,
+    average_negative_signal: 0,
+    average_neutral_signal: 0,
+    average_intensity: 0,
+    average_valence: 0,
+  },
+  emotion_distribution: {},
+  average_trust_percent: 0,
+  top_sources: {},
+  headlines: [],
+};

@@ -109,6 +109,10 @@ test-reports/
 # -----------------------------------------------------------------------------
 build/
 dist/
+.next/
+node_modules/
+out/
+*.tsbuildinfo
 *.egg-info/
 .eggs/
 

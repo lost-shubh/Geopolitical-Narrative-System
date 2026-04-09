@@ -1,0 +1,45 @@
+name: Publish Live Snapshot
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/30 * * * *"
+
+concurrency:
+  group: publish-live-snapshot
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GNS_ENABLE_TRANSFORMERS: "0"
+      NEWS_API_KEY: ${{ secrets.NEWS_API_KEY }}
+      BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+      GNS_LIVE_QUERY: ${{ vars.GNS_LIVE_QUERY }}
+      GNS_BLOB_SNAPSHOT_PATH: ${{ vars.GNS_BLOB_SNAPSHOT_PATH }}
+      GNS_MAX_ARTICLES: ${{ vars.GNS_MAX_ARTICLES }}
+      GNS_MAX_HEADLINES: ${{ vars.GNS_MAX_HEADLINES }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install minimal refresh dependencies
+        run: python -m pip install --upgrade pip && pip install -r requirements-live-web.txt
+
+      - name: Publish latest dashboard snapshot
+        shell: bash
+        run: |
+          python -m src.realtime.publish_live_snapshot \
+            --query "${GNS_LIVE_QUERY:-geopolitics}" \
+            --max-articles "${GNS_MAX_ARTICLES:-36}" \
+            --max-headlines "${GNS_MAX_HEADLINES:-12}" \
+            --blob-path "${GNS_BLOB_SNAPSHOT_PATH:-dashboard/live/latest.json}"
