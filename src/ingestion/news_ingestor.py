@@ -24,7 +24,7 @@ class NewsIngestor:
     MAX_RETRIES = 3
     REQUEST_TIMEOUT_SECONDS = 10
     BASE_BACKOFF_SECONDS = 1.0
-    TOP_HEADLINE_COUNTRIES = ["us", "gb", "in", "au", "ca"]
+    TOP_HEADLINE_COUNTRIES = ["us"]
     GLOBAL_NEWS_DOMAINS = [
         "reuters.com",
         "apnews.com",
@@ -599,10 +599,18 @@ class NewsIngestor:
                 )
             except requests.exceptions.HTTPError as exc:
                 status_code = exc.response.status_code if exc.response is not None else None
-                self.last_failure_reason = f"{request_name} HTTP {status_code}" if status_code else f"{request_name} HTTP error"
+                api_message = self._extract_api_message(exc.response)
+                if status_code:
+                    self.last_failure_reason = (
+                        f"{request_name} HTTP {status_code}: {api_message}"
+                        if api_message
+                        else f"{request_name} HTTP {status_code}"
+                    )
+                else:
+                    self.last_failure_reason = f"{request_name} HTTP error"
                 if status_code and status_code >= 500:
                     logger.warning(
-                        "NewsAPI HTTP server error | request=%s | query=%s | context=%s | page=%s | attempt=%s/%s | status_code=%s",
+                        "NewsAPI HTTP server error | request=%s | query=%s | context=%s | page=%s | attempt=%s/%s | status_code=%s | message=%s",
                         request_name,
                         query,
                         context,
@@ -610,16 +618,18 @@ class NewsIngestor:
                         attempt,
                         self.MAX_RETRIES,
                         status_code,
+                        api_message or "",
                     )
                 else:
                     logger.error(
-                        "NewsAPI HTTP client error | request=%s | query=%s | context=%s | page=%s | attempt=%s | status_code=%s",
+                        "NewsAPI HTTP client error | request=%s | query=%s | context=%s | page=%s | attempt=%s | status_code=%s | message=%s",
                         request_name,
                         query,
                         context,
                         page,
                         attempt,
                         status_code,
+                        api_message or "",
                     )
                     return None
             except requests.exceptions.RequestException as exc:
@@ -671,6 +681,25 @@ class NewsIngestor:
             message = message.replace(self.api_key, "[REDACTED]")
         message = re.sub(r"(apiKey=)([^&\s)\"']+)", r"\1[REDACTED]", message)
         return message
+
+    def _extract_api_message(self, response: requests.Response | None) -> str:
+        """Read NewsAPI's logical error message when available."""
+        if response is None:
+            return ""
+
+        try:
+            payload = response.json()
+        except ValueError:
+            return ""
+
+        if not isinstance(payload, dict):
+            return ""
+
+        message = payload.get("message", "")
+        if not isinstance(message, str):
+            return ""
+
+        return self._sanitize_error_message(message)
 
 
 def main():

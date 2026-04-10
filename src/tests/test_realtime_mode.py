@@ -256,6 +256,33 @@ def test_news_ingestor_sanitizes_api_key_in_error_messages():
     assert "[REDACTED]" in sanitized
 
 
+def test_news_ingestor_surfaces_api_message_on_429(monkeypatch):
+    class FakeResponse:
+        status_code = 429
+
+        def raise_for_status(self):
+            raise requests.exceptions.HTTPError("429", response=self)
+
+        def json(self):
+            return {"status": "error", "message": "You have made too many requests recently. Developer accounts are limited."}
+
+    monkeypatch.setattr(news_ingestor.requests, "get", lambda *_args, **_kwargs: FakeResponse())
+
+    ingestor = news_ingestor.NewsIngestor(api_key="test-key")
+    payload = ingestor._request_json_with_retries(
+        url="https://newsapi.org/v2/top-headlines",
+        params={"country": "us", "apiKey": "test-key"},
+        request_name="top-headlines",
+        query="geopolitics",
+        page=1,
+        context="us",
+    )
+
+    assert payload is None
+    assert "HTTP 429" in ingestor.last_failure_reason
+    assert "too many requests" in ingestor.last_failure_reason.lower()
+
+
 def test_news_ingestor_filters_irrelevant_articles():
     ingestor = news_ingestor.NewsIngestor(api_key="test-key")
     articles = [
