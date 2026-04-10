@@ -158,7 +158,7 @@ async def upload_snapshot_to_blob(
     if AsyncBlobClient is None:
         raise RuntimeError("Vercel Blob SDK is not installed. Install the `vercel` package first.")
 
-    client = AsyncBlobClient()
+    client = AsyncBlobClient(token=token)
     payload = json.dumps(snapshot, ensure_ascii=False, indent=2).encode("utf-8")
     uploaded = await client.put(
         blob_path,
@@ -168,7 +168,6 @@ async def upload_snapshot_to_blob(
         overwrite=True,
         cache_control_max_age=cache_control_max_age,
         content_type="application/json",
-        token=token,
     )
     return dict(uploaded)
 
