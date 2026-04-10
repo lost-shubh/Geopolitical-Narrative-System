@@ -18,7 +18,7 @@ jobs:
 
       - name: Upload to Vercel Blob
         run: |
-          RESPONSE=$(curl -X PUT "https://blob.vercel-storage.com/snapshots/latest.json?allowOverwrite=true" \
+          RESPONSE=$(curl -X PUT "https://blob.vercel-storage.com/dashboard/live/latest.json?allowOverwrite=true" \
           -H "Authorization: Bearer ${{ secrets.BLOB_READ_WRITE_TOKEN }}" \
           -H "Content-Type: application/json" \
           --data-binary @data.json)
