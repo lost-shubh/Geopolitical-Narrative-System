@@ -4,6 +4,10 @@ import type { DeepSentimentSummary, HeadlineRecord, LiveSnapshot, LiveSnapshotEn
 
 const DEFAULT_PATH = "dashboard/live/latest.json";
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 function asNumber(value: unknown, fallback = 0) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
@@ -42,7 +46,7 @@ function normalizeDeepSentimentSummary(value: unknown): DeepSentimentSummary {
 }
 
 function normalizeMetricRecord(value: unknown) {
-  if (typeof value !== "object" || value === null) {
+  if (!isRecord(value)) {
     return {};
   }
 
@@ -51,8 +55,37 @@ function normalizeMetricRecord(value: unknown) {
   );
 }
 
+function isProcessedSnapshotPayload(value: unknown): value is Record<string, unknown> {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.status === "string" &&
+    typeof value.query === "string" &&
+    Array.isArray(value.headlines) &&
+    isRecord(value.sentiment_distribution) &&
+    isRecord(value.deep_sentiment_distribution) &&
+    isRecord(value.deep_sentiment_summary) &&
+    isRecord(value.emotion_distribution) &&
+    isRecord(value.top_sources)
+  );
+}
+
+function looksLikeRawNewsApiPayload(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    value.status === "ok" &&
+    typeof value.totalResults === "number" &&
+    Array.isArray(value.articles)
+  );
+}
+
 function normalizeSnapshot(value: unknown): LiveSnapshot {
-  const item = typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
+  const item = isRecord(value) ? value : {};
   return {
     schema_version: asNumber(item.schema_version, 1),
     status: asString(item.status, "unknown"),
@@ -89,7 +122,16 @@ export async function loadSnapshotEnvelope(): Promise<LiveSnapshotEnvelope> {
       throw new Error(`Blob fetch failed with HTTP ${response.status}`);
     }
 
-    const snapshot = normalizeSnapshot(await response.json());
+    const payload = await response.json();
+    if (!isProcessedSnapshotPayload(payload)) {
+      if (looksLikeRawNewsApiPayload(payload)) {
+        throw new Error("Blob contains raw NewsAPI JSON. Run the Python snapshot publisher before uploading.");
+      }
+
+      throw new Error("Blob payload is missing the processed live snapshot fields required by the dashboard.");
+    }
+
+    const snapshot = normalizeSnapshot(payload);
     return {
       source: "blob",
       blobPath,
