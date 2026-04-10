@@ -169,7 +169,22 @@ async def upload_snapshot_to_blob(
         cache_control_max_age=cache_control_max_age,
         content_type="application/json",
     )
-    return dict(uploaded)
+    if isinstance(uploaded, dict):
+        return dict(uploaded)
+
+    download_url = getattr(uploaded, "download_url", "")
+    content_type = getattr(uploaded, "content_type", "application/json")
+    content_disposition = getattr(uploaded, "content_disposition", "")
+    return {
+        "url": getattr(uploaded, "url", ""),
+        "download_url": download_url,
+        "downloadUrl": download_url,
+        "pathname": getattr(uploaded, "pathname", blob_path),
+        "content_type": content_type,
+        "contentType": content_type,
+        "content_disposition": content_disposition,
+        "contentDisposition": content_disposition,
+    }
 
 
 def publish_snapshot(
