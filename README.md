@@ -19,6 +19,7 @@
 - [Project Structure](#project-structure)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
+- [Benchmark & Evaluation Metrics](#benchmark--evaluation-metrics)
 - [Development Roadmap](#development-roadmap)
 - [Ethical Framework](#ethical-framework)
 - [Technical Details](#technical-details)
@@ -669,3 +670,54 @@ This system is a research tool. While we strive for accuracy, automated fact-che
 ---
 
 **Built with ❤️ for truth, transparency, and informed public discourse.**
+---
+
+## Benchmark & Evaluation Metrics
+
+The project uses pretrained NLP backbones for sentiment, emotion, and NER. The table below separates:
+
+- model benchmark metrics for the exact pretrained models configured in this repo
+- operational pipeline metrics measured from local GNS runs and reports
+
+### Model-Level Metrics
+
+| Component | Model used in GNS | Accuracy | F1-Score | ROC-AUC | Precision | Recall | Source |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
+| Sentiment analysis | `distilbert-base-uncased-finetuned-sst-2-english` | 91.1% | 91.4% | 97.2% | 89.8% | 93.0% | [Hugging Face model card](https://huggingface.co/distilbert/distilbert-base-uncased-finetuned-sst-2-english) |
+| Emotion analysis | `j-hartmann/emotion-english-distilroberta-base` | 66.0% | - | - | - | - | [Hugging Face model card](https://huggingface.co/j-hartmann/emotion-english-distilroberta-base) |
+| Named entity recognition | `en_core_web_sm` | - | 84.56% | - | 84.55% | 84.57% | [spaCy model card](https://huggingface.co/spacy/en_core_web_sm) |
+
+### Pipeline-Level Runtime Metrics
+
+These are the current GNS runtime benchmarks documented in the repo:
+
+| Pipeline step | Measured throughput |
+| --- | ---: |
+| News ingestion | ~2-5 seconds per 10 articles |
+| Sentiment analysis | ~0.5 seconds per article |
+| Emotion analysis | ~1 second per article |
+| Claim extraction | ~2-3 seconds per article |
+| Full end-to-end pipeline | ~3-5 minutes for 10 articles |
+
+Source: [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)
+
+### Latest End-to-End Pipeline Run
+
+The latest recorded local pipeline run produced the following system-level outputs:
+
+| Metric | Value | Source |
+| --- | ---: | --- |
+| Articles analyzed | 9 | [pipeline_run_summary.json](data/processed/pipeline_results/pipeline_run_summary.json) |
+| Comments analyzed | 9 | [FINAL_REPORT.txt](data/processed/pipeline_results/FINAL_REPORT.txt) |
+| Verified claims | 10 | [FINAL_REPORT.txt](data/processed/pipeline_results/FINAL_REPORT.txt) |
+| Generated counter-narratives | 10 | [FINAL_REPORT.txt](data/processed/pipeline_results/FINAL_REPORT.txt) |
+| Average evidence credibility | 0.87 | [FINAL_REPORT.txt](data/processed/pipeline_results/FINAL_REPORT.txt) |
+| Negative coverage in latest run | 77.78% | [FINAL_REPORT.txt](data/processed/pipeline_results/FINAL_REPORT.txt) |
+| Polarization level | 1.0 (high) | [FINAL_REPORT.txt](data/processed/pipeline_results/FINAL_REPORT.txt) |
+
+### Reporting Note
+
+- `F1-Score`, `Accuracy`, and `ROC-AUC` are now explicitly visible in this README.
+- The sentiment metrics above come from the exact pretrained sentiment backbone configured in [`src/analysis/sentiment.py`](src/analysis/sentiment.py).
+- The emotion and NER metrics come from the exact pretrained backbones configured in [`src/analysis/emotion.py`](src/analysis/emotion.py) and [`src/preprocessing/entity_extraction.py`](src/preprocessing/entity_extraction.py).
+- The current repository does not yet contain a labeled end-to-end GNS benchmark dataset for reporting a single unified system-wide ROC-AUC or F1, so those values are reported at the model-component level rather than as a fabricated overall score.
