@@ -10,7 +10,11 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
+import sys
 from typing import Any, Dict
+
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from dotenv import load_dotenv
 
@@ -22,7 +26,7 @@ except Exception:  # pragma: no cover - optional dependency failure
 from src.analysis.emotion import EmotionAnalyzer
 from src.analysis.sentiment import SentimentAnalyzer
 from src.pipeline.stage1_content_extraction import run_stage as run_stage1
-from src.realtime.live_news_monitor import _build_snapshot, _persist_snapshot
+from src.realtime.live_news_monitor import _build_snapshot, _persist_snapshot, _write_json_atomic
 from src.utils.api_clients import load_model_config, load_pipeline_config
 from src.verification.source_credibility import SourceCredibilityScorer
 
@@ -87,12 +91,11 @@ def generate_live_snapshot(
     )
 
     try:
-        fetch_budget = min(max(max_articles, max_headlines * 4, 25), 100)
         stage1_result = run_stage1(
             query=query,
             sources=sources,
             days_back=days_back,
-            max_articles=fetch_budget,
+            max_articles=max_articles,
             use_existing_data=False,
             offline_mode=False,
             strict_live=True,
@@ -140,11 +143,26 @@ def generate_live_snapshot(
         return _degraded_snapshot(query=query, message=str(exc))
 
 
-def persist_snapshot_locally(snapshot: Dict[str, Any], output_dir: Path | None = None) -> Path:
+def persist_snapshot_locally(
+    snapshot: Dict[str, Any],
+    output_dir: Path | None = None,
+    output_path: Path | None = None,
+) -> Path:
     """Write the latest snapshot to the local realtime output directory."""
+    if output_path is not None:
+        output_path = Path(output_path)
+        output_dir = output_dir or output_path.parent
+
     output_dir = output_dir or Path("data/processed/realtime")
     _persist_snapshot(snapshot, output_dir=output_dir)
-    return output_dir / "live_snapshot.json"
+    default_path = output_dir / "live_snapshot.json"
+
+    if output_path is None:
+        return default_path
+
+    if output_path.resolve() != default_path.resolve():
+        _write_json_atomic(snapshot, output_path)
+    return output_path
 
 
 async def upload_snapshot_to_blob(
@@ -199,6 +217,7 @@ def publish_snapshot(
     cache_control_max_age: int = 60,
     skip_upload: bool = False,
     output_dir: Path | None = None,
+    output_path: Path | None = None,
 ) -> Dict[str, Any]:
     """Generate, persist, and optionally upload the latest dashboard snapshot."""
     snapshot = generate_live_snapshot(
@@ -210,8 +229,10 @@ def publish_snapshot(
         prefer_transformers=prefer_transformers,
     )
 
-    local_path = persist_snapshot_locally(snapshot, output_dir=output_dir)
+    output_path = Path(output_path) if output_path is not None else None
+    local_path = output_path or (output_dir or Path("data/processed/realtime")) / "live_snapshot.json"
     snapshot["local_snapshot_file"] = str(local_path)
+    persist_snapshot_locally(snapshot, output_dir=output_dir, output_path=output_path)
 
     if skip_upload:
         logger.info("Skipping Blob upload | local_snapshot=%s", local_path)
@@ -226,7 +247,7 @@ def publish_snapshot(
     )
     snapshot["blob"] = upload_metadata
     snapshot["blob_path"] = blob_path
-    persist_snapshot_locally(snapshot, output_dir=output_dir)
+    persist_snapshot_locally(snapshot, output_dir=output_dir, output_path=output_path)
     logger.info(
         "Uploaded live snapshot to Blob | path=%s | url=%s",
         blob_path,
@@ -246,6 +267,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--blob-path", default=DEFAULT_BLOB_PATH, help="Target pathname inside the Blob store")
     parser.add_argument("--cache-max-age", type=int, default=60, help="Blob cache max age in seconds")
     parser.add_argument("--skip-upload", action="store_true", help="Write the snapshot locally without uploading to Blob")
+    parser.add_argument("--output", type=Path, help="Optional local JSON file path for the generated snapshot")
     return parser
 
 
@@ -264,6 +286,7 @@ def cli_main() -> Dict[str, Any]:
         blob_path=args.blob_path,
         cache_control_max_age=args.cache_max_age,
         skip_upload=args.skip_upload,
+        output_path=args.output,
     )
     print(json.dumps(result, indent=2, ensure_ascii=False))
     return result

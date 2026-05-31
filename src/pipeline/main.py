@@ -6,7 +6,11 @@ import argparse
 import json
 from datetime import datetime
 from pathlib import Path
+import sys
 from typing import Dict
+
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from dotenv import load_dotenv
 

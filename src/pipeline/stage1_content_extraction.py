@@ -8,7 +8,11 @@ import logging
 import time
 from collections import Counter
 from pathlib import Path
+import sys
 from typing import Dict, List
+
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from dotenv import load_dotenv
 
@@ -149,6 +153,8 @@ def run_stage(
     if not articles:
         logger.error("Stage 1 ended with 0 articles | query=%s", query)
         raise RuntimeError("Stage 1 could not load any news articles.")
+
+    articles = articles[:max_articles]
 
     entity_extractor = EntityExtractor(model_name=model_config["spacy_model"])
     language_detector = LanguageDetector()

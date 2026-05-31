@@ -9,11 +9,15 @@ import hashlib
 import json
 import logging
 import os
+import sys
 import time
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
+
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from dotenv import load_dotenv
 from rich.console import Console
@@ -412,12 +416,11 @@ def run_live_monitor(
         cycle_started = time.perf_counter()
         logger.info("Live cycle started | cycle=%s | query=%s", cycle, query)
         try:
-            fetch_budget = min(max(max_articles, max_headlines * 4, 25), 100)
             stage1_result = run_stage1(
                 query=query,
                 sources=sources,
                 days_back=days_back,
-                max_articles=fetch_budget,
+                max_articles=max_articles,
                 use_existing_data=False,
                 offline_mode=False,
                 strict_live=True,
@@ -532,7 +535,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--query", help="Live query override")
     parser.add_argument("--sources", help="Optional comma-separated NewsAPI source IDs")
     parser.add_argument("--days", type=int, help="Days back to fetch")
-    parser.add_argument("--max-articles", type=int, help="Maximum live articles per cycle")
+    parser.add_argument("--max-articles", type=int, help="Maximum live articles to fetch per cycle")
     parser.add_argument(
         "--interval",
         type=int,

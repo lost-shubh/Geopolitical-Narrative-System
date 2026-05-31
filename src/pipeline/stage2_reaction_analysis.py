@@ -8,11 +8,15 @@ API credentials are unavailable.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
-import random
 from collections import Counter
 from pathlib import Path
+import sys
 from typing import Dict, List
+
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from src.utils.api_clients import load_pipeline_config
 
@@ -43,7 +47,7 @@ def _infer_sentiment_hint(text: str) -> str:
         return "NEGATIVE"
     if pos_hits > neg_hits:
         return "POSITIVE"
-    return random.choice(["NEUTRAL", "NEGATIVE", "POSITIVE"])
+    return "NEUTRAL"
 
 
 def _compose_weighted_text(title: str, description: str) -> str:
@@ -57,11 +61,13 @@ def _compose_weighted_text(title: str, description: str) -> str:
 
 def _prefixed_reaction_body(body: str, sentiment_hint: str) -> str:
     if sentiment_hint == "NEGATIVE":
-        prefix = random.choice(NEGATIVE_PREFIXES)
+        options = NEGATIVE_PREFIXES
     elif sentiment_hint == "POSITIVE":
-        prefix = random.choice(POSITIVE_PREFIXES)
+        options = POSITIVE_PREFIXES
     else:
-        prefix = random.choice(NEUTRAL_PREFIXES)
+        options = NEUTRAL_PREFIXES
+    digest = hashlib.sha1(f"{sentiment_hint}|{body}".encode("utf-8")).hexdigest()
+    prefix = options[int(digest[:8], 16) % len(options)]
     return f"{prefix} {body}"
 
 

@@ -5,7 +5,11 @@ Stage 3: analyze news and social reactions.
 import argparse
 import json
 from pathlib import Path
+import sys
 from typing import Dict
+
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from src.analysis.emotion import EmotionAnalyzer
 from src.analysis.engagement_metrics import EngagementMetricsAnalyzer

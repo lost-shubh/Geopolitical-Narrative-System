@@ -1,5 +1,4 @@
 import { head } from "@vercel/blob";
-import { mockSnapshot } from "@/src/lib/mock-snapshot";
 import type { DeepSentimentSummary, HeadlineRecord, LiveSnapshot, LiveSnapshotEnvelope } from "@/src/lib/types";
 
 const DEFAULT_PATH = "dashboard/live/latest.json";
@@ -111,6 +110,40 @@ function normalizeSnapshot(value: unknown): LiveSnapshot {
   };
 }
 
+function errorSnapshot(blobPath: string, error: unknown): LiveSnapshot {
+  const message = error instanceof Error ? error.message : "Blob snapshot unavailable";
+  const now = new Date().toISOString();
+  return {
+    schema_version: 1,
+    status: "degraded",
+    generated_at: now,
+    published_at: now,
+    last_updated: now,
+    cycle: 0,
+    query: "geopolitics",
+    articles_count: 0,
+    article_count: 0,
+    fetched_articles_count: 0,
+    new_articles_count: 0,
+    seen_articles_skipped: 0,
+    message,
+    error: message,
+    sentiment_distribution: {},
+    deep_sentiment_distribution: {},
+    deep_sentiment_summary: {
+      average_positive_signal: 0,
+      average_negative_signal: 0,
+      average_neutral_signal: 0,
+      average_intensity: 0,
+      average_valence: 0,
+    },
+    emotion_distribution: {},
+    average_trust_percent: 0,
+    top_sources: {},
+    headlines: [],
+  };
+}
+
 export async function loadSnapshotEnvelope(): Promise<LiveSnapshotEnvelope> {
   const blobPath = process.env.GNS_BLOB_SNAPSHOT_PATH || DEFAULT_PATH;
 
@@ -139,10 +172,10 @@ export async function loadSnapshotEnvelope(): Promise<LiveSnapshotEnvelope> {
     };
   } catch (error) {
     return {
-      source: "mock",
+      source: "error",
       blobPath,
       error: error instanceof Error ? error.message : "Blob snapshot unavailable",
-      snapshot: mockSnapshot,
+      snapshot: errorSnapshot(blobPath, error),
     };
   }
 }

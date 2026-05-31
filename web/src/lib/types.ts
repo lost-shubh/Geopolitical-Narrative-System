@@ -48,7 +48,7 @@ export interface LiveSnapshot {
 }
 
 export interface LiveSnapshotEnvelope {
-  source: "blob" | "mock";
+  source: "blob" | "error";
   blobPath: string;
   error?: string;
   snapshot: LiveSnapshot;

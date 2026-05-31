@@ -5,7 +5,11 @@ Stage 5: counter-narrative generation and reporting.
 import argparse
 import json
 from pathlib import Path
+import sys
 from typing import Dict
+
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from src.synthesis.narrative_generator import NarrativeGenerator
 from src.utils.api_clients import load_pipeline_config

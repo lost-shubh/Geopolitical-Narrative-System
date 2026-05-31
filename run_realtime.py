@@ -20,7 +20,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--topic", help="Legacy alias for query")
     parser.add_argument("--sources", help="Optional comma-separated NewsAPI source IDs")
     parser.add_argument("--days", type=int, help="Days back to fetch")
-    parser.add_argument("--max-articles", type=int, help="Maximum live articles per cycle")
+    parser.add_argument("--max-articles", type=int, help="Maximum live articles to fetch per cycle")
     parser.add_argument(
         "--interval",
         type=int,

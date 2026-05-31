@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import src.realtime.publish_live_snapshot as publisher
@@ -61,3 +62,42 @@ def test_publish_snapshot_persists_locally_when_upload_is_skipped(monkeypatch, t
     assert Path(result["local_snapshot_file"]) == snapshot_file
     assert snapshot_file.exists()
     assert history_file.exists()
+    assert json.loads(snapshot_file.read_text(encoding="utf-8"))["local_snapshot_file"] == str(snapshot_file)
+
+
+def test_publish_snapshot_accepts_custom_output_path(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        publisher,
+        "generate_live_snapshot",
+        lambda **_kwargs: {
+            "schema_version": 1,
+            "status": "ok",
+            "generated_at": "2026-04-09T00:00:00",
+            "last_updated": "2026-04-09T00:00:00",
+            "published_at": "2026-04-09T00:00:00",
+            "cycle": 1,
+            "query": "geopolitics",
+            "articles_count": 1,
+            "article_count": 1,
+            "fetched_articles_count": 1,
+            "new_articles_count": 1,
+            "seen_articles_skipped": 0,
+            "message": "",
+            "sentiment_distribution": {"NEGATIVE": 1},
+            "deep_sentiment_distribution": {"strongly_negative": 1},
+            "deep_sentiment_summary": {"average_intensity": 0.8},
+            "emotion_distribution": {"fear": 1},
+            "average_trust_percent": 91.2,
+            "top_sources": {"Reuters": 1},
+            "headlines": [{"title": "Talks collapse", "source": "Reuters"}],
+        },
+    )
+
+    output_path = tmp_path / "snapshot-test.json"
+    result = publisher.publish_snapshot(skip_upload=True, output_path=output_path)
+
+    assert Path(result["local_snapshot_file"]) == output_path
+    assert output_path.exists()
+    assert (tmp_path / "live_snapshot.json").exists()
+    assert (tmp_path / "live_history.jsonl").exists()
+    assert json.loads(output_path.read_text(encoding="utf-8"))["local_snapshot_file"] == str(output_path)

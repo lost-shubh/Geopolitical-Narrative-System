@@ -13,6 +13,7 @@
 *.pem
 credentials.json
 token.json
+config/api_keys.yaml
 
 # -----------------------------------------------------------------------------
 # DATA (RAW / GENERATED / SCRAPED — NEVER COMMIT)

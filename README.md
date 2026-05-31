@@ -10,7 +10,7 @@
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Overview](#overview)
 - [Problem Statement](#problem-statement)
@@ -192,7 +192,7 @@ geopolitical-narrative-system/
 ├── LICENSE                            # MIT License
 │
 ├── config/
-│   ├── api_keys.yaml                  # API configurations (not committed)
+│   ├── api_keys.example.yaml          # API configuration template
 │   ├── model_config.yaml              # Model parameters
 │   └── pipeline_config.yaml           # Pipeline settings
 │
@@ -329,18 +329,12 @@ python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords')"
 
 ### Step 5: Configure API Keys
 
-Create `config/api_keys.yaml` (see `config/api_keys.example.yaml`):
+Copy `config/api_keys.example.yaml` to `config/api_keys.yaml`, then set `NEWS_API_KEY` in your environment or put the key in the local config file:
 
 ```yaml
-news_api:
-  key: "YOUR_NEWSAPI_KEY"
-  
-twitter:
-  bearer_token: "YOUR_TWITTER_BEARER_TOKEN"
-  
-reddit:
-  client_id: "YOUR_REDDIT_CLIENT_ID"
-  client_secret: "YOUR_REDDIT_CLIENT_SECRET"
+news_api_env: NEWS_API_KEY
+news_api_key: ""
+require_news_api_key: true
 ```
 
 **⚠️ Never commit `api_keys.yaml` to version control**
@@ -362,16 +356,16 @@ python pipeline/main.py --topic "election interference" --days 7
 python pipeline/stage1_content_extraction.py --query "geopolitical conflict"
 
 # Stage 2: Collect social reactions
-python pipeline/stage2_reaction_collection.py --article-id 12345
+python pipeline/stage2_reaction_collection.py --max-comments 25
 
 # Stage 3: Analyze reactions
-python pipeline/stage3_reaction_analysis.py --input data/processed/reactions/
+python pipeline/stage3_reaction_analysis.py
 
 # Stage 4: Find factual evidence
-python pipeline/stage4_fact_discovery.py --claims data/processed/extracted_claims/
+python pipeline/stage4_fact_discovery.py --top-claims 10
 
 # Stage 5: Generate counter-narrative
-python pipeline/stage5_narrative_synthesis.py --evidence data/processed/evidence/
+python pipeline/stage5_narrative_synthesis.py --tone analytical
 ```
 
 ### Example Output
