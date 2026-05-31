@@ -41,6 +41,7 @@ def run_pipeline(
     offline_mode: bool | None = None,
     strict_live: bool | None = None,
     tone: str | None = None,
+    comments_file: str | None = None,
     live_output: bool = False,
 ) -> Dict:
     """Run the full five-stage pipeline."""
@@ -68,11 +69,12 @@ def run_pipeline(
             f"Saved: {stage1_result['processed_file']}",
         ])
 
-    stage2_result = run_stage2(stage1_result=stage1_result)
+    stage2_result = run_stage2(stage1_result=stage1_result, comments_file=comments_file)
     database.record_stage(run_id, "stage2", "completed", {"processed_file": stage2_result["processed_file"]})
     if live_output:
         _print_live_section("STAGE 2 COMPLETE", [
             f"Comments collected: {stage2_result['comment_count']}",
+            f"Reaction source: {stage2_result['reaction_source']}",
             f"Platforms: {stage2_result['platform_distribution']}",
             f"Saved: {stage2_result['processed_file']}",
         ])
@@ -119,6 +121,7 @@ def run_pipeline(
         },
         "stage2": {
             "comment_count": stage2_result["comment_count"],
+            "reaction_source": stage2_result["reaction_source"],
             "processed_file": stage2_result["processed_file"],
         },
         "stage3": {
@@ -166,6 +169,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--strict-live", action="store_true", help="Require live NewsAPI fetch for Stage 1")
     parser.add_argument("--no-strict-live", action="store_true", help="Disable strict live mode")
     parser.add_argument("--tone", choices=["analytical", "public", "policy"], help="Narrative tone")
+    parser.add_argument("--comments-file", help="Optional JSON export of real social comments for Stage 2")
     parser.add_argument("--live", action="store_true", help="Print stage summaries and the final report in the terminal")
     return parser
 
@@ -188,6 +192,7 @@ def cli_main() -> Dict:
         offline_mode=args.offline,
         strict_live=strict_live,
         tone=args.tone,
+        comments_file=args.comments_file,
         live_output=args.live,
     )
     print("=" * 70)

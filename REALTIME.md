@@ -48,7 +48,15 @@ The dashboard auto-refreshes and reads the latest snapshot from the live monitor
 
 - `config/pipeline_config.yaml` defaults to real-time mode (`realtime_only: true`).
 - Stage 1 strict live mode requires `NEWS_API_KEY`.
-- Stage 2 now derives reaction rows from live article text (news-only pipeline, no mock social dataset).
+- Stage 2 derives reaction rows from live article text when no social export is provided.
+- To analyze real public reactions, pass a JSON export with `--comments-file`:
+
+```powershell
+.\venv\Scripts\python.exe run_pipeline.py --comments-file data\raw\social\comments.json --live
+```
+
+The social JSON can be a list of comment objects or `{ "comments": [...] }`. Supported text fields include `text`, `body`, `comment`, `content`, and `message`; optional fields include `platform`, `topic`, `timestamp`, `author`, `url`, and engagement counts.
+- Stage 4 can add Google Fact Check evidence when `GOOGLE_FACTCHECK_API_KEY` is configured.
 
 ## GitHub Codespaces
 

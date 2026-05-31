@@ -335,9 +335,14 @@ Copy `config/api_keys.example.yaml` to `config/api_keys.yaml`, then set `NEWS_AP
 news_api_env: NEWS_API_KEY
 news_api_key: ""
 require_news_api_key: true
+google_factcheck_env: GOOGLE_FACTCHECK_API_KEY
+google_factcheck_api_key: ""
+enable_google_factcheck: true
 ```
 
 **⚠️ Never commit `api_keys.yaml` to version control**
+
+`GOOGLE_FACTCHECK_API_KEY` is optional. When it is set, Stage 4 adds Google Fact Check claim-review evidence to the local article and research evidence already used by the verifier.
 
 ---
 
@@ -357,6 +362,9 @@ python pipeline/stage1_content_extraction.py --query "geopolitical conflict"
 
 # Stage 2: Collect social reactions
 python pipeline/stage2_reaction_collection.py --max-comments 25
+
+# Stage 2 with an external social export
+python pipeline/stage2_reaction_collection.py --comments-file data/raw/social/comments.json --max-comments 100
 
 # Stage 3: Analyze reactions
 python pipeline/stage3_reaction_analysis.py

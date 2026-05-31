@@ -32,7 +32,7 @@ The pipeline automatically:
 
 1\. \*\*Fetches geopolitical news\*\* (or uses existing data)
 
-2\. \*\*Generates social media comments\*\* (mock data for testing)
+2\. \*\*Collects social reaction rows\*\* from an external JSON export, or derives a news-based reaction proxy when no export is provided
 
 3\. \*\*Analyzes news sentiment \& emotions\*\*
 
@@ -118,11 +118,14 @@ python test\_news\_ingestion.py
 
 
 
-\### \*\*Stage 2: Generate Social Data\*\*
+\### \*\*Stage 2: Collect Reaction Data\*\*
 
 ```powershell
 
-python create\_mock\_data.py
+python pipeline/stage2\_reaction_collection.py --max-comments 25
+
+# Optional: use a real social export
+python pipeline/stage2\_reaction_collection.py --comments-file data/raw/social/comments.json --max-comments 100
 
 ```
 
@@ -190,9 +193,9 @@ Started: 2026-01-16 14:30:00
 
 
 
-✓ Using existing mock social media data
+✓ Using external social export or news-derived reaction proxy
 
-✓ Loaded 231 comments
+✓ Loaded 25 reaction rows
 
 
 
@@ -230,9 +233,9 @@ Started: 2026-01-16 14:30:00
 
 
 
-📂 Loading comments from: data/raw/social/mock\_social\_comments.json
+📂 Loading reaction rows from: data/processed/stage2_reaction_collection/relevant_comments.json
 
-✓ Loaded 231 comments
+✓ Loaded 25 reaction rows
 
 
 

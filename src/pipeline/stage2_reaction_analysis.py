@@ -18,6 +18,8 @@ from typing import Dict, List
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from src.ingestion.comment_collector import CommentCollector
+from src.ingestion.social_ingestor import SocialIngestor
 from src.utils.api_clients import load_pipeline_config
 
 POSITIVE_HINTS = ("progress", "agreement", "ceasefire", "stability", "cooperation", "diplomatic breakthrough")
@@ -113,10 +115,33 @@ def _build_news_reactions(articles: List[Dict], max_comments: int) -> List[Dict]
     return reactions
 
 
-def run_stage(*, stage1_result: Dict | None = None, max_comments: int | None = None) -> Dict:
+def _select_external_reactions(articles: List[Dict], comments: List[Dict], max_comments: int) -> List[Dict]:
+    """Prefer topic-matched external comments, but keep untagged exports usable."""
+    if not comments:
+        return []
+
+    tagged_comments = [
+        comment for comment in comments
+        if comment.get("topic") not in {None, "", "external", "general_geopolitics"}
+    ]
+    if tagged_comments:
+        matched = CommentCollector().collect_relevant_comments(articles, tagged_comments, max_comments=max_comments)
+        if matched:
+            return matched
+
+    return comments[:max_comments]
+
+
+def run_stage(
+    *,
+    stage1_result: Dict | None = None,
+    max_comments: int | None = None,
+    comments_file: str | Path | None = None,
+) -> Dict:
     """Collect reaction-like rows from Stage 1 article output."""
     pipeline_config = load_pipeline_config()
     max_comments = max_comments or pipeline_config["max_social_comments"]
+    comments_file = comments_file or pipeline_config.get("social_comments_file")
 
     if stage1_result is None:
         stage1_file = Path("data/processed/stage1_content_extraction/articles_with_context.json")
@@ -126,7 +151,19 @@ def run_stage(*, stage1_result: Dict | None = None, max_comments: int | None = N
             stage1_result = json.load(handle)
 
     articles = stage1_result.get("articles", [])
-    reactions = _build_news_reactions(articles, max_comments=max_comments)
+    reaction_source = "news_proxy"
+    source_file = stage1_result.get("raw_news_file", "")
+    reactions: List[Dict] = []
+
+    if comments_file:
+        external_comments = SocialIngestor().load_normalized_comments(comments_file)
+        reactions = _select_external_reactions(articles, external_comments, max_comments=max_comments)
+        if reactions:
+            reaction_source = "external_social_file"
+            source_file = str(comments_file)
+
+    if not reactions:
+        reactions = _build_news_reactions(articles, max_comments=max_comments)
 
     topic_counts = Counter(item.get("topic", "unknown") for item in reactions)
     platform_counts = Counter(item.get("platform", "unknown") for item in reactions)
@@ -138,7 +175,8 @@ def run_stage(*, stage1_result: Dict | None = None, max_comments: int | None = N
     with open(output_file, "w", encoding="utf-8") as handle:
         json.dump(
             {
-                "source_file": stage1_result.get("raw_news_file", ""),
+                "source_file": source_file,
+                "reaction_source": reaction_source,
                 "total_comments": len(reactions),
                 "topic_distribution": dict(topic_counts),
                 "platform_distribution": dict(platform_counts),
@@ -150,7 +188,8 @@ def run_stage(*, stage1_result: Dict | None = None, max_comments: int | None = N
         )
 
     return {
-        "source_file": stage1_result.get("raw_news_file", ""),
+        "source_file": source_file,
+        "reaction_source": reaction_source,
         "processed_file": str(output_file),
         "comment_count": len(reactions),
         "topic_distribution": dict(topic_counts),
@@ -162,13 +201,14 @@ def run_stage(*, stage1_result: Dict | None = None, max_comments: int | None = N
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run Stage 2 reaction collection.")
     parser.add_argument("--max-comments", type=int, help="Limit collected reaction rows")
+    parser.add_argument("--comments-file", help="Optional JSON export of real social comments to analyze")
     return parser
 
 
 def cli_main() -> Dict:
     parser = build_parser()
     args = parser.parse_args()
-    result = run_stage(max_comments=args.max_comments)
+    result = run_stage(max_comments=args.max_comments, comments_file=args.comments_file)
     print(f"Stage 2 complete. Collected {result['comment_count']} reaction rows.")
     print(f"Saved to: {result['processed_file']}")
     return result

@@ -206,34 +206,15 @@ SEMANTIC_SCHOLAR_API_KEY=your_semantic_scholar_key
 
 ### Step 7: Create Configuration Files
 
-Create `config/api_keys.yaml`:
+Copy `config/api_keys.example.yaml` to `config/api_keys.yaml`:
 
 ```yaml
-news:
-  newsapi:
-    key: ${NEWS_API_KEY}
-  
-social_media:
-  twitter:
-    bearer_token: ${TWITTER_BEARER_TOKEN}
-  reddit:
-    client_id: ${REDDIT_CLIENT_ID}
-    client_secret: ${REDDIT_CLIENT_SECRET}
-    user_agent: ${REDDIT_USER_AGENT}
-  youtube:
-    api_key: ${YOUTUBE_API_KEY}
-
-llm:
-  openai:
-    api_key: ${OPENAI_API_KEY}
-    model: gpt-4-turbo-preview
-  anthropic:
-    api_key: ${ANTHROPIC_API_KEY}
-    model: claude-3-opus-20240229
-
-research:
-  semantic_scholar:
-    api_key: ${SEMANTIC_SCHOLAR_API_KEY}
+news_api_env: NEWS_API_KEY
+news_api_key: ""
+require_news_api_key: true
+google_factcheck_env: GOOGLE_FACTCHECK_API_KEY
+google_factcheck_api_key: ""
+enable_google_factcheck: true
 ```
 
 ---

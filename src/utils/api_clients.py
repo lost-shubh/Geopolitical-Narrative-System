@@ -19,6 +19,7 @@ DEFAULT_PIPELINE_CONFIG = {
     "poll_interval_seconds": 60,
     "realtime_max_headlines": 18,
     "max_social_comments": 250,
+    "social_comments_file": "",
     "default_tone": "analytical",
 }
 
@@ -33,6 +34,9 @@ DEFAULT_API_KEYS_CONFIG = {
     "news_api_env": "NEWS_API_KEY",
     "news_api_key": "",
     "require_news_api_key": True,
+    "google_factcheck_env": "GOOGLE_FACTCHECK_API_KEY",
+    "google_factcheck_api_key": "",
+    "enable_google_factcheck": True,
 }
 
 

@@ -120,6 +120,51 @@ def test_stage2_builds_reactions_from_news_articles():
     assert result["comments"][0]["topic"] == "nato"
 
 
+def test_stage2_uses_external_social_comments_file(tmp_path):
+    comments_file = tmp_path / "comments.json"
+    comments_file.write_text(
+        json.dumps(
+            {
+                "comments": [
+                    {
+                        "id": "r1",
+                        "body": "NATO response is getting major attention in public forums.",
+                        "platform": "reddit",
+                        "topic": "nato",
+                        "score": 42,
+                        "created_at": "2026-04-05T00:05:00Z",
+                    },
+                    {
+                        "id": "r2",
+                        "body": "This unrelated sports post should be filtered out.",
+                        "platform": "reddit",
+                        "topic": "sports",
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    stage1_result = {
+        "raw_news_file": "data/raw/news/pipeline_news.json",
+        "articles": [
+            {
+                "title": "NATO leaders meet in Brussels",
+                "description": "Leaders discussed alliance coordination this week.",
+                "topics": ["nato"],
+            }
+        ],
+    }
+
+    result = run_stage2(stage1_result=stage1_result, max_comments=10, comments_file=comments_file)
+
+    assert result["reaction_source"] == "external_social_file"
+    assert result["comment_count"] == 1
+    assert result["comments"][0]["comment_id"] == "r1"
+    assert result["comments"][0]["platform"] == "reddit"
+    assert result["comments"][0]["engagement"]["likes"] == 42
+
+
 def test_stage1_strict_live_raises_when_fetch_returns_zero(monkeypatch):
     class EmptyNewsIngestor:
         def __init__(self, api_key: str, data_dir: str):

@@ -9,18 +9,31 @@ from typing import Dict, List, Sequence
 
 from .evidence_ranker import EvidenceRanker
 from .fact_finder import FactFinder
+from .google_factcheck import GoogleFactCheckSearch
 from .research_search import ResearchSearch
 
 
 class FactChecker:
     """Search for factual evidence to verify claims."""
 
-    def __init__(self, articles: Sequence[Dict] | None = None):
+    def __init__(
+        self,
+        articles: Sequence[Dict] | None = None,
+        external_factcheck: GoogleFactCheckSearch | None = None,
+        enable_external_factcheck: bool = True,
+    ):
         """Initialize fact checker."""
         print("Initializing fact checker...")
         self.search_results_cache = {}
         self.fact_finder = FactFinder(articles=articles)
         self.research_search = ResearchSearch()
+        self.external_factcheck = (
+            external_factcheck
+            if external_factcheck is not None
+            else GoogleFactCheckSearch.from_config()
+        )
+        if not enable_external_factcheck:
+            self.external_factcheck = GoogleFactCheckSearch(enabled=False)
         self.ranker = EvidenceRanker()
 
     def search_web(self, query: str, max_results: int = 3) -> List[Dict]:
@@ -36,7 +49,8 @@ class FactChecker:
         print(f"  Searching for: {query[:60]}...")
         local_evidence = self.fact_finder.search_claim(query, max_results=max_results)
         research_evidence = self.research_search.search(query, max_results=max_results)
-        results = self.ranker.rank(local_evidence + research_evidence, max_results=max_results)
+        external_evidence = self.external_factcheck.search(query, max_results=max_results)
+        results = self.ranker.rank(local_evidence + research_evidence + external_evidence, max_results=max_results)
 
         self.search_results_cache[query] = results
         return results
@@ -50,7 +64,8 @@ class FactChecker:
 
         local_evidence = self.fact_finder.search_claim(claim_text, claim_type=claim_type, max_results=6)
         research_evidence = self.research_search.search(claim_text, entities=entities, max_results=3)
-        evidence = self.ranker.rank(local_evidence + research_evidence, max_results=5)
+        external_evidence = self.external_factcheck.search(search_query, max_results=3)
+        evidence = self.ranker.rank(local_evidence + research_evidence + external_evidence, max_results=5)
 
         avg_credibility = sum(item["credibility_score"] for item in evidence) / len(evidence) if evidence else 0.0
         support_weight = sum(item["credibility_score"] for item in evidence if item.get("stance") == "support")

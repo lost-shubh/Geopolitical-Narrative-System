@@ -542,15 +542,15 @@ geopolitical-narrative-system/
 
 \### \*\*Current Limitations\*\*
 
-\- Mock fact-checking (needs real API integration)
+\- Fact-checking uses local evidence by default; Google Fact Check enrichment is optional when an API key is configured
 
 \- Limited to English language
 
 \- Simple narrative templates (not GPT-4 level)
 
-\- No real-time processing
+\- Real-time processing is available for NewsAPI-backed headline monitoring
 
-\- No visualization dashboard
+\- A React/Vercel dashboard and local realtime dashboard are available
 
 
 
@@ -560,11 +560,12 @@ geopolitical-narrative-system/
 
 \*\*Phase 1: API Integration (2-4 weeks)\*\*
 
-\- \[ ] Google Fact Check Tools API
+\- \[x] Optional Google Fact Check Tools API enrichment
 
 \- \[ ] Semantic Scholar API for papers
 
-\- \[ ] Real Twitter/Reddit API integration
+\- \[x] External social comment JSON ingestion
+\- \[ ] Direct Twitter/Reddit API ingestion
 
 \- \[ ] FactCheck.org scraping
 
@@ -584,13 +585,13 @@ geopolitical-narrative-system/
 
 \*\*Phase 3: Infrastructure (4-8 weeks)\*\*
 
-\- \[ ] Real-time processing pipeline
+\- \[x] Real-time processing pipeline
 
 \- \[ ] Database integration (PostgreSQL)
 
 \- \[ ] API backend (FastAPI)
 
-\- \[ ] Web dashboard (React/Streamlit)
+\- \[x] Web dashboard (React/Streamlit)
 
 
 
