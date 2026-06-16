@@ -18,8 +18,16 @@ DEFAULT_PIPELINE_CONFIG = {
     "realtime_only": True,
     "poll_interval_seconds": 60,
     "realtime_max_headlines": 18,
+    "gdelt_fallback_enabled": True,
+    "rss_fallback_enabled": True,
     "max_social_comments": 250,
     "social_comments_file": "",
+    "llm_enabled": False,
+    "llm_provider": "openai_responses",
+    "llm_model": "gpt-4.1-mini",
+    "llm_timeout_seconds": 30,
+    "llm_max_output_tokens": 700,
+    "llm_temperature": 0.2,
     "default_tone": "analytical",
 }
 
@@ -34,9 +42,15 @@ DEFAULT_API_KEYS_CONFIG = {
     "news_api_env": "NEWS_API_KEY",
     "news_api_key": "",
     "require_news_api_key": True,
+    "gdelt_enabled": True,
+    "rss_enabled": True,
     "google_factcheck_env": "GOOGLE_FACTCHECK_API_KEY",
     "google_factcheck_api_key": "",
     "enable_google_factcheck": True,
+    "llm_api_key_env": "OPENAI_API_KEY",
+    "llm_api_base_env": "GNS_LLM_API_BASE",
+    "llm_api_key": "",
+    "llm_api_base": "https://api.openai.com/v1",
 }
 
 

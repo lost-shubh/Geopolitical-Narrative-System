@@ -4,7 +4,7 @@ This project now supports strict live-news mode with continuous refresh and live
 
 ## 1) Set API key
 
-Create `.env` in project root:
+NewsAPI is useful but no longer mandatory for live mode. Create `.env` in project root if you have a key:
 
 ```env
 NEWS_API_KEY=your_newsapi_key
@@ -47,8 +47,8 @@ The dashboard auto-refreshes and reads the latest snapshot from the live monitor
 ## Notes
 
 - `config/pipeline_config.yaml` defaults to real-time mode (`realtime_only: true`).
-- Stage 1 strict live mode requires `NEWS_API_KEY`.
-- Stage 2 derives reaction rows from live article text when no social export is provided.
+- Stage 1 strict live mode uses `NEWS_API_KEY` when configured and falls back to free no-key sources when NewsAPI is unavailable: GDELT first, then RSS search.
+- Stage 2 can analyze an external social JSON export or derive reaction rows from live article text as the final fallback.
 - To analyze real public reactions, pass a JSON export with `--comments-file`:
 
 ```powershell
@@ -57,6 +57,13 @@ The dashboard auto-refreshes and reads the latest snapshot from the live monitor
 
 The social JSON can be a list of comment objects or `{ "comments": [...] }`. Supported text fields include `text`, `body`, `comment`, `content`, and `message`; optional fields include `platform`, `topic`, `timestamp`, `author`, `url`, and engagement counts.
 - Stage 4 can add Google Fact Check evidence when `GOOGLE_FACTCHECK_API_KEY` is configured.
+- Stage 5 can use optional LLM synthesis with template fallback:
+
+```powershell
+.\venv\Scripts\python.exe run_pipeline.py --llm --llm-model gpt-4.1-mini --live
+```
+
+Set `OPENAI_API_KEY` locally before using `--llm`. You can override OpenAI-compatible endpoints with `GNS_LLM_API_BASE`.
 
 ## GitHub Codespaces
 
@@ -72,6 +79,8 @@ pip install -r requirements-codespaces.txt
 echo 'NEWS_API_KEY=your_newsapi_key' > .env
 python run_realtime.py --query "geopolitics" --interval 60
 ```
+
+If you do not have a NewsAPI key, skip the `echo` line. The pipeline will use the free no-key fallbacks.
 
 To run the dashboard in Codespaces:
 

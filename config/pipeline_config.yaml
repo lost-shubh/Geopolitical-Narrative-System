@@ -6,6 +6,14 @@ offline_mode: false
 realtime_only: false
 poll_interval_seconds: 60
 realtime_max_headlines: 18
+gdelt_fallback_enabled: true
+rss_fallback_enabled: true
 max_social_comments: 250
 social_comments_file: ""
+llm_enabled: false
+llm_provider: openai_responses
+llm_model: gpt-4.1-mini
+llm_timeout_seconds: 30
+llm_max_output_tokens: 700
+llm_temperature: 0.2
 default_tone: analytical

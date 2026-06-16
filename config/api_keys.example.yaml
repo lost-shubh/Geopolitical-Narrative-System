@@ -1,7 +1,14 @@
 news_api_env: NEWS_API_KEY
 news_api_key: ""
 require_news_api_key: true
+gdelt_enabled: true
+rss_enabled: true
 
 google_factcheck_env: GOOGLE_FACTCHECK_API_KEY
 google_factcheck_api_key: ""
 enable_google_factcheck: true
+
+llm_api_key_env: OPENAI_API_KEY
+llm_api_base_env: GNS_LLM_API_BASE
+llm_api_key: ""
+llm_api_base: "https://api.openai.com/v1"

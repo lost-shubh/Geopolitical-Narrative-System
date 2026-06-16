@@ -42,6 +42,10 @@ def run_pipeline(
     strict_live: bool | None = None,
     tone: str | None = None,
     comments_file: str | None = None,
+    use_llm: bool | None = None,
+    llm_provider: str | None = None,
+    llm_model: str | None = None,
+    llm_api_base: str | None = None,
     live_output: bool = False,
 ) -> Dict:
     """Run the full five-stage pipeline."""
@@ -69,7 +73,10 @@ def run_pipeline(
             f"Saved: {stage1_result['processed_file']}",
         ])
 
-    stage2_result = run_stage2(stage1_result=stage1_result, comments_file=comments_file)
+    stage2_result = run_stage2(
+        stage1_result=stage1_result,
+        comments_file=comments_file,
+    )
     database.record_stage(run_id, "stage2", "completed", {"processed_file": stage2_result["processed_file"]})
     if live_output:
         _print_live_section("STAGE 2 COMPLETE", [
@@ -101,7 +108,15 @@ def run_pipeline(
             f"Disputed claims: {verification['disputed_count']}",
         ])
 
-    stage5_result = run_stage5(stage4_result=stage4_result, stage3_result=stage3_result, tone=tone)
+    stage5_result = run_stage5(
+        stage4_result=stage4_result,
+        stage3_result=stage3_result,
+        tone=tone,
+        use_llm=use_llm,
+        llm_provider=llm_provider,
+        llm_model=llm_model,
+        llm_api_base=llm_api_base,
+    )
     database.record_stage(run_id, "stage5", "completed", {"report_file": stage5_result["final_report"]})
     if live_output:
         _print_live_section("STAGE 5 COMPLETE", [
@@ -170,6 +185,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-strict-live", action="store_true", help="Disable strict live mode")
     parser.add_argument("--tone", choices=["analytical", "public", "policy"], help="Narrative tone")
     parser.add_argument("--comments-file", help="Optional JSON export of real social comments for Stage 2")
+    parser.add_argument("--llm", action="store_true", help="Use optional LLM narrative synthesis in Stage 5")
+    parser.add_argument("--llm-provider", help="LLM provider: openai_responses or openai_chat")
+    parser.add_argument("--llm-model", help="LLM model override")
+    parser.add_argument("--llm-api-base", help="OpenAI-compatible API base URL")
     parser.add_argument("--live", action="store_true", help="Print stage summaries and the final report in the terminal")
     return parser
 
@@ -193,6 +212,10 @@ def cli_main() -> Dict:
         strict_live=strict_live,
         tone=args.tone,
         comments_file=args.comments_file,
+        use_llm=args.llm,
+        llm_provider=args.llm_provider,
+        llm_model=args.llm_model,
+        llm_api_base=args.llm_api_base,
         live_output=args.live,
     )
     print("=" * 70)

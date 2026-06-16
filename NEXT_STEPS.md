@@ -168,7 +168,7 @@ Tools: PowerPoint, Google Slides, or Canva
 
 
 
-Current status: Stage 2 can now use external social comment JSON exports, and Stage 4 can enrich evidence with Google Fact Check when `GOOGLE_FACTCHECK_API_KEY` is configured. Remaining API work is direct platform ingestion and broader research-source integrations.
+Current status: Stage 1 can now fall back to free no-key sources when NewsAPI is missing or empty (GDELT first, then RSS search), Stage 2 can use external social comment JSON exports, and Stage 4 can enrich evidence with Google Fact Check when `GOOGLE_FACTCHECK_API_KEY` is configured. Remaining work is stronger exported-data workflows, source diversity, broader research-source integrations, and evaluation against real comment datasets.
 
 
 

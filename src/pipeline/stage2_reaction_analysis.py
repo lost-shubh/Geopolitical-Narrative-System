@@ -154,6 +154,7 @@ def run_stage(
     reaction_source = "news_proxy"
     source_file = stage1_result.get("raw_news_file", "")
     reactions: List[Dict] = []
+    fallback_reason = ""
 
     if comments_file:
         external_comments = SocialIngestor().load_normalized_comments(comments_file)
@@ -164,6 +165,8 @@ def run_stage(
 
     if not reactions:
         reactions = _build_news_reactions(articles, max_comments=max_comments)
+        if not comments_file:
+            fallback_reason = "No external social export configured; derived reaction rows from article text."
 
     topic_counts = Counter(item.get("topic", "unknown") for item in reactions)
     platform_counts = Counter(item.get("platform", "unknown") for item in reactions)
@@ -177,6 +180,7 @@ def run_stage(
             {
                 "source_file": source_file,
                 "reaction_source": reaction_source,
+                "fallback_reason": fallback_reason,
                 "total_comments": len(reactions),
                 "topic_distribution": dict(topic_counts),
                 "platform_distribution": dict(platform_counts),
@@ -190,6 +194,7 @@ def run_stage(
     return {
         "source_file": source_file,
         "reaction_source": reaction_source,
+        "fallback_reason": fallback_reason,
         "processed_file": str(output_file),
         "comment_count": len(reactions),
         "topic_distribution": dict(topic_counts),
@@ -208,7 +213,10 @@ def build_parser() -> argparse.ArgumentParser:
 def cli_main() -> Dict:
     parser = build_parser()
     args = parser.parse_args()
-    result = run_stage(max_comments=args.max_comments, comments_file=args.comments_file)
+    result = run_stage(
+        max_comments=args.max_comments,
+        comments_file=args.comments_file,
+    )
     print(f"Stage 2 complete. Collected {result['comment_count']} reaction rows.")
     print(f"Saved to: {result['processed_file']}")
     return result

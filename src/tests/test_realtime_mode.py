@@ -12,14 +12,17 @@ import src.ingestion.news_ingestor as news_ingestor
 import src.pipeline.main as pipeline_main
 import src.pipeline.stage1_content_extraction as stage1
 import run_realtime
+from src.ingestion.gdelt_ingestor import GDELTNewsIngestor
+from src.ingestion.rss_ingestor import RSSNewsIngestor
 from src.pipeline.stage2_reaction_analysis import run_stage as run_stage2
 import src.realtime.live_news_monitor as live_monitor
 
 
-def test_stage1_strict_live_requires_api_key(monkeypatch):
+def test_stage1_strict_live_requires_live_source_when_no_fallback(monkeypatch):
     monkeypatch.setattr(stage1, "get_news_api_key", lambda _cfg=None: "")
+    monkeypatch.setattr(stage1, "load_api_config", lambda: {"gdelt_enabled": False, "rss_enabled": False})
 
-    with pytest.raises(RuntimeError, match="requires NEWS_API_KEY"):
+    with pytest.raises(RuntimeError, match="Strict live mode failed: 0 articles fetched"):
         stage1.run_stage(
             query="geopolitics",
             days_back=1,
@@ -28,6 +31,47 @@ def test_stage1_strict_live_requires_api_key(monkeypatch):
             offline_mode=False,
             strict_live=True,
         )
+
+
+def test_stage1_strict_live_uses_gdelt_without_newsapi_key(monkeypatch, tmp_path):
+    class FakeGDELTIngestor:
+        def __init__(self, data_dir: str):
+            self.data_dir = Path(data_dir)
+            self.data_dir.mkdir(parents=True, exist_ok=True)
+
+        def fetch_news(self, **_kwargs):
+            return [
+                {
+                    "title": "Diplomacy talks continue",
+                    "description": "GDELT global coverage item: Diplomats discussed ceasefire options.",
+                    "content": "",
+                    "url": "https://example.test/gdelt-talks",
+                    "source": {"name": "example.test"},
+                    "publishedAt": "2026-04-05T00:00:00Z",
+                }
+            ]
+
+        def save_articles(self, articles, filename):
+            output = self.data_dir / filename
+            with open(output, "w", encoding="utf-8") as handle:
+                json.dump({"total_articles": len(articles), "articles": articles}, handle, indent=2)
+            return str(output)
+
+    monkeypatch.setattr(stage1, "get_news_api_key", lambda _cfg=None: "")
+    monkeypatch.setattr(stage1, "GDELTNewsIngestor", FakeGDELTIngestor)
+    monkeypatch.chdir(tmp_path)
+
+    result = stage1.run_stage(
+        query="diplomacy",
+        days_back=1,
+        max_articles=5,
+        use_existing_data=False,
+        offline_mode=False,
+        strict_live=True,
+    )
+
+    assert result["article_count"] == 1
+    assert result["articles"][0]["url"] == "https://example.test/gdelt-talks"
 
 
 def test_stage1_strict_live_fetches_and_processes_articles(monkeypatch, tmp_path):
@@ -129,7 +173,7 @@ def test_stage2_uses_external_social_comments_file(tmp_path):
                     {
                         "id": "r1",
                         "body": "NATO response is getting major attention in public forums.",
-                        "platform": "reddit",
+                        "platform": "forum_export",
                         "topic": "nato",
                         "score": 42,
                         "created_at": "2026-04-05T00:05:00Z",
@@ -137,7 +181,7 @@ def test_stage2_uses_external_social_comments_file(tmp_path):
                     {
                         "id": "r2",
                         "body": "This unrelated sports post should be filtered out.",
-                        "platform": "reddit",
+                        "platform": "forum_export",
                         "topic": "sports",
                     },
                 ]
@@ -161,8 +205,75 @@ def test_stage2_uses_external_social_comments_file(tmp_path):
     assert result["reaction_source"] == "external_social_file"
     assert result["comment_count"] == 1
     assert result["comments"][0]["comment_id"] == "r1"
-    assert result["comments"][0]["platform"] == "reddit"
+    assert result["comments"][0]["platform"] == "forum_export"
     assert result["comments"][0]["engagement"]["likes"] == 42
+
+
+def test_gdelt_ingestor_normalizes_article_list():
+    class FakeResponse:
+        status_code = 200
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "articles": [
+                    {
+                        "url": "https://example.test/global-coverage",
+                        "title": "Global security talks continue",
+                        "domain": "example.test",
+                        "seendate": "20260405010203",
+                        "sourcecountry": "US",
+                        "language": "English",
+                        "socialimage": "https://example.test/image.jpg",
+                    }
+                ]
+            }
+
+    class FakeSession:
+        def get(self, url, **_kwargs):
+            assert "api.gdeltproject.org" in url
+            return FakeResponse()
+
+    ingestor = GDELTNewsIngestor(session=FakeSession())
+    articles = ingestor.fetch_news(query="global security", days_back=2, max_articles=5)
+
+    assert len(articles) == 1
+    assert articles[0]["title"] == "Global security talks continue"
+    assert articles[0]["source"]["name"] == "example.test"
+    assert articles[0]["publishedAt"] == "2026-04-05T01:02:03Z"
+    assert articles[0]["source_api"] == "gdelt_doc"
+
+
+def test_rss_ingestor_normalizes_search_feed():
+    class FakeResponse:
+        status_code = 200
+        content = b"""<?xml version="1.0" encoding="UTF-8" ?>
+        <rss><channel><item>
+          <title>Diplomacy update</title>
+          <link>https://example.test/diplomacy</link>
+          <description><![CDATA[<p>Officials discussed ceasefire options.</p>]]></description>
+          <pubDate>Sun, 05 Apr 2026 01:02:03 GMT</pubDate>
+          <source url="https://example.test">Example News</source>
+        </item></channel></rss>"""
+
+        def raise_for_status(self):
+            return None
+
+    class FakeSession:
+        def get(self, url, **_kwargs):
+            assert "news.google.com/rss/search" in url
+            return FakeResponse()
+
+    ingestor = RSSNewsIngestor(session=FakeSession())
+    articles = ingestor.fetch_news(query="diplomacy", max_articles=5)
+
+    assert len(articles) == 1
+    assert articles[0]["title"] == "Diplomacy update"
+    assert articles[0]["description"] == "Officials discussed ceasefire options."
+    assert articles[0]["source"]["name"] == "Example News"
+    assert articles[0]["source_api"] == "rss_search"
 
 
 def test_stage1_strict_live_raises_when_fetch_returns_zero(monkeypatch):

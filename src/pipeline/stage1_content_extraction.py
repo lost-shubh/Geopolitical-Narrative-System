@@ -16,7 +16,9 @@ if __package__ in {None, ""}:
 
 from dotenv import load_dotenv
 
+from src.ingestion.gdelt_ingestor import GDELTNewsIngestor
 from src.ingestion.news_ingestor import NewsIngestor
+from src.ingestion.rss_ingestor import RSSNewsIngestor
 from src.preprocessing.clean_text import clean_article_fields
 from src.preprocessing.entity_extraction import EntityExtractor
 from src.preprocessing.language_detect import LanguageDetector
@@ -31,6 +33,64 @@ TOPIC_KEYWORDS = {
     "nato": {"nato", "alliance"},
     "elections": {"election", "interference", "democracy"},
 }
+
+
+def _fetch_with_free_fallback(
+    *,
+    api_key: str,
+    raw_dir: Path,
+    query: str,
+    sources: str | None,
+    days_back: int,
+    max_articles: int,
+    gdelt_enabled: bool,
+    rss_enabled: bool,
+) -> tuple[List[Dict], object | None, str]:
+    """Fetch live articles through NewsAPI first, then free no-key sources."""
+    failures: List[str] = []
+
+    if api_key:
+        news_ingestor = NewsIngestor(api_key=api_key, data_dir=str(raw_dir))
+        fetched = news_ingestor.fetch_news(
+            query=query,
+            sources=sources,
+            days_back=days_back,
+            max_articles=max_articles,
+        )
+        if fetched:
+            return fetched, news_ingestor, ""
+        reason = getattr(news_ingestor, "last_failure_reason", "") or "NewsAPI returned 0 articles"
+        failures.append(reason)
+    else:
+        failures.append("NEWS_API_KEY is not configured")
+
+    if gdelt_enabled:
+        gdelt_ingestor = GDELTNewsIngestor(data_dir=str(raw_dir))
+        fetched = gdelt_ingestor.fetch_news(
+            query=query,
+            days_back=days_back,
+            max_articles=max_articles,
+        )
+        if fetched:
+            logger.info("Using free GDELT live-news fallback | query=%s | articles=%s", query, len(fetched))
+            return fetched, gdelt_ingestor, "; ".join(failures)
+        reason = getattr(gdelt_ingestor, "last_failure_reason", "") or "GDELT returned 0 articles"
+        failures.append(reason)
+
+    if rss_enabled:
+        rss_ingestor = RSSNewsIngestor(data_dir=str(raw_dir))
+        fetched = rss_ingestor.fetch_news(
+            query=query,
+            days_back=days_back,
+            max_articles=max_articles,
+        )
+        if fetched:
+            logger.info("Using free RSS live-news fallback | query=%s | articles=%s", query, len(fetched))
+            return fetched, rss_ingestor, "; ".join(failures)
+        reason = getattr(rss_ingestor, "last_failure_reason", "") or "RSS returned 0 articles"
+        failures.append(reason)
+
+    return [], None, "; ".join(failures)
 
 
 def infer_topics(article: Dict) -> List[str]:
@@ -75,6 +135,12 @@ def run_stage(
     use_existing_data = pipeline_config["use_existing_data"] if use_existing_data is None else use_existing_data
     offline_mode = pipeline_config["offline_mode"] if offline_mode is None else offline_mode
     strict_live = pipeline_config.get("realtime_only", False) if strict_live is None else strict_live
+    gdelt_enabled = bool(api_config.get("gdelt_enabled", True)) and bool(
+        pipeline_config.get("gdelt_fallback_enabled", True)
+    )
+    rss_enabled = bool(api_config.get("rss_enabled", True)) and bool(
+        pipeline_config.get("rss_fallback_enabled", True)
+    )
 
     logger.info(
         "Stage 1 starting | query=%s | strict_live=%s | use_existing_data=%s | offline_mode=%s | max_articles=%s",
@@ -96,18 +162,18 @@ def run_stage(
         if offline_mode:
             raise RuntimeError("Stage 1 strict live mode cannot run with offline_mode=True.")
         api_key = get_news_api_key(api_config)
-        if not api_key:
-            raise RuntimeError("Stage 1 strict live mode requires NEWS_API_KEY.")
 
-        ingestor = NewsIngestor(api_key=api_key, data_dir=str(raw_dir))
-        fetched = ingestor.fetch_news(
+        fetched, ingestor, failure_reason = _fetch_with_free_fallback(
+            api_key=api_key,
+            raw_dir=raw_dir,
             query=query,
             sources=sources,
             days_back=days_back,
             max_articles=max_articles,
+            gdelt_enabled=gdelt_enabled,
+            rss_enabled=rss_enabled,
         )
         if not fetched:
-            failure_reason = getattr(ingestor, "last_failure_reason", "")
             logger.error(
                 "Strict live mode fetched 0 articles | query=%s | reason=%s",
                 query,
@@ -120,7 +186,7 @@ def run_stage(
             )
 
         logger.info("Strict live fetch returned %s articles | query=%s", len(fetched), query)
-        raw_path = ingestor.save_articles(fetched, raw_file.name)
+        raw_path = ingestor.save_articles(fetched, raw_file.name) if ingestor else ""
         raw_file = Path(raw_path)
         articles = _load_existing_articles(raw_file)
     else:
@@ -131,21 +197,27 @@ def run_stage(
             articles = _load_existing_articles(raw_file)
         elif not offline_mode:
             api_key = get_news_api_key(api_config)
-            if api_key:
-                ingestor = NewsIngestor(api_key=api_key, data_dir=str(raw_dir))
-                fetched = ingestor.fetch_news(
-                    query=query,
-                    sources=sources,
-                    days_back=days_back,
-                    max_articles=max_articles,
+            fetched, ingestor, failure_reason = _fetch_with_free_fallback(
+                api_key=api_key,
+                raw_dir=raw_dir,
+                query=query,
+                sources=sources,
+                days_back=days_back,
+                max_articles=max_articles,
+                gdelt_enabled=gdelt_enabled,
+                rss_enabled=rss_enabled,
+            )
+            if fetched and ingestor:
+                raw_path = ingestor.save_articles(fetched, raw_file.name)
+                raw_file = Path(raw_path)
+                articles = _load_existing_articles(raw_file)
+                logger.info("Fetched %s live articles for Stage 1 | query=%s", len(fetched), query)
+            else:
+                logger.warning(
+                    "Live fetch returned 0 articles in non-strict mode | query=%s | reason=%s",
+                    query,
+                    failure_reason or "no matching live articles returned",
                 )
-                if fetched:
-                    raw_path = ingestor.save_articles(fetched, raw_file.name)
-                    raw_file = Path(raw_path)
-                    articles = _load_existing_articles(raw_file)
-                    logger.info("Fetched %s live articles for Stage 1 | query=%s", len(fetched), query)
-                else:
-                    logger.warning("Live fetch returned 0 articles in non-strict mode | query=%s", query)
         if not articles and fallback_file.exists():
             raw_file = fallback_file
             articles = _load_existing_articles(raw_file)

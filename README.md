@@ -7,6 +7,7 @@
 > An NLP-powered intelligence system for detecting, analyzing, and countering false geopolitical narratives through evidence-based fact verification and automated counter-narrative synthesis.
 
 **Live mode:** see [REALTIME.md](REALTIME.md) to run strict real-time news fetching and live dashboards.
+If NewsAPI is unavailable, Stage 1 can continue with free no-key GDELT/RSS fallbacks.
 
 ---
 
@@ -219,7 +220,7 @@ geopolitical-narrative-system/
 │   ├── ingestion/
 │   │   ├── __init__.py
 │   │   ├── news_ingestor.py           # News API/RSS/scraper
-│   │   ├── social_ingestor.py         # Twitter, Reddit, Facebook APIs
+│   │   ├── social_ingestor.py         # External social/comment exports
 │   │   └── comment_collector.py        # Comment thread extraction
 │   │
 │   ├── preprocessing/
@@ -366,6 +367,9 @@ python pipeline/stage2_reaction_collection.py --max-comments 25
 # Stage 2 with an external social export
 python pipeline/stage2_reaction_collection.py --comments-file data/raw/social/comments.json --max-comments 100
 
+# Stage 2 can also derive reaction-like rows from article text when no export is available
+python pipeline/stage2_reaction_collection.py --max-comments 100
+
 # Stage 3: Analyze reactions
 python pipeline/stage3_reaction_analysis.py
 
@@ -374,7 +378,12 @@ python pipeline/stage4_fact_discovery.py --top-claims 10
 
 # Stage 5: Generate counter-narrative
 python pipeline/stage5_narrative_synthesis.py --tone analytical
+
+# Stage 5 with optional LLM synthesis
+python pipeline/stage5_narrative_synthesis.py --llm --llm-model gpt-4.1-mini --tone analytical
 ```
+
+LLM synthesis is disabled by default and falls back to the template generator if `OPENAI_API_KEY` is not configured or the API request fails.
 
 ### Example Output
 
@@ -419,7 +428,7 @@ python pipeline/stage5_narrative_synthesis.py --tone analytical
 - [ ] Simple sentiment analysis
 
 ### 🔄 Version 0.2 - Core Analysis
-- [ ] Real API integrations (Twitter, Reddit, News)
+- [ ] Free/open data integrations (GDELT, NewsAPI fallback, exported public comments)
 - [ ] Multi-source content aggregation
 - [ ] Advanced sentiment & emotion detection
 - [ ] Polarization metrics implementation
@@ -523,7 +532,7 @@ This system is built on strict ethical guidelines:
 
 **Social Media:**
 - Twitter/X API v2
-- Reddit API (PRAW)
+- Optional exported social/comment datasets
 - YouTube Data API
 
 **Fact-Checking:**

@@ -64,7 +64,7 @@ A \*\*production-ready, end-to-end AI-powered system\*\* that:
 
 │  STAGE 2: SOCIAL MEDIA COLLECTION                        │
 
-│  • Twitter/Reddit/Facebook APIs                           │
+│  • External social/comment exports                        │
 
 │  • Comment thread extraction                              │
 
@@ -565,7 +565,7 @@ geopolitical-narrative-system/
 \- \[ ] Semantic Scholar API for papers
 
 \- \[x] External social comment JSON ingestion
-\- \[ ] Direct Twitter/Reddit API ingestion
+\- \[ ] Exported public-comment workflows and additional free/open data sources
 
 \- \[ ] FactCheck.org scraping
 

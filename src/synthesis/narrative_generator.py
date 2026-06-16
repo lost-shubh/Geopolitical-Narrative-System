@@ -9,6 +9,7 @@ from typing import Dict, List
 from datetime import datetime
 
 from .evidence_compiler import EvidenceCompiler
+from .llm_client import LLMClient, LLMGenerationError
 from .tone_adjuster import ToneAdjuster
 
 
@@ -38,11 +39,13 @@ class NarrativeGenerator:
         },
     }
 
-    def __init__(self):
+    def __init__(self, *, use_llm: bool = False, llm_client: LLMClient | None = None):
         """Initialize narrative generator."""
         print("Initializing narrative generator...")
         self.compiler = EvidenceCompiler()
         self.tone_adjuster = ToneAdjuster()
+        self.use_llm = use_llm
+        self.llm_client = llm_client
 
     def generate_verdict(self, verification_status: str, credibility_score: float) -> str:
         """Generate a verdict statement based on verification results."""
@@ -81,19 +84,38 @@ class NarrativeGenerator:
         evidence_bullets = compiled["bullet_points"] or self.generate_evidence_summary(evidence)
         verdict = self.generate_verdict(status, credibility)
         conclusion = template["conclusion"].format(verdict=verdict)
+        generation_backend = "template"
+        llm_error = ""
 
-        narrative_parts = [
-            intro,
-            "",
-            evidence_header,
-            *evidence_bullets,
-            "",
-            conclusion,
-        ]
-        narrative_text = "\n".join(narrative_parts)
-        narrative_text = self.tone_adjuster.adjust(narrative_text, tone=tone)
+        if self.use_llm:
+            try:
+                narrative_text = self._generate_llm_counter_narrative(
+                    verified_claim=verified_claim,
+                    compiled=compiled,
+                    tone=tone,
+                    verdict=verdict,
+                )
+                generation_backend = "llm"
+            except LLMGenerationError as exc:
+                llm_error = str(exc)
+                narrative_text = self._generate_template_text(
+                    intro=intro,
+                    evidence_header=evidence_header,
+                    evidence_bullets=evidence_bullets,
+                    conclusion=conclusion,
+                    tone=tone,
+                )
+                generation_backend = "template_fallback"
+        else:
+            narrative_text = self._generate_template_text(
+                intro=intro,
+                evidence_header=evidence_header,
+                evidence_bullets=evidence_bullets,
+                conclusion=conclusion,
+                tone=tone,
+            )
 
-        return {
+        result = {
             "original_claim": claim_text,
             "claim_type": claim_type,
             "verification_status": status,
@@ -104,7 +126,82 @@ class NarrativeGenerator:
             "confidence": "high" if credibility > 0.8 else "medium" if credibility > 0.6 else "low",
             "tone": tone,
             "bibliography": compiled["bibliography"],
+            "generation_backend": generation_backend,
         }
+        if self.llm_client is not None and self.llm_client.model:
+            result["llm_model"] = self.llm_client.model
+            result["llm_provider"] = self.llm_client.provider
+        if llm_error:
+            result["llm_error"] = llm_error
+        return result
+
+    def _generate_template_text(
+        self,
+        *,
+        intro: str,
+        evidence_header: str,
+        evidence_bullets: List[str],
+        conclusion: str,
+        tone: str,
+    ) -> str:
+        narrative_parts = [
+            intro,
+            "",
+            evidence_header,
+            *evidence_bullets,
+            "",
+            conclusion,
+        ]
+        return self.tone_adjuster.adjust("\n".join(narrative_parts), tone=tone)
+
+    def _generate_llm_counter_narrative(
+        self,
+        *,
+        verified_claim: Dict,
+        compiled: Dict,
+        tone: str,
+        verdict: str,
+    ) -> str:
+        if self.llm_client is None:
+            raise LLMGenerationError("LLM client is not configured.")
+
+        system_prompt = (
+            "You are a careful geopolitical fact-checking analyst. Generate concise "
+            "counter-narratives only from the supplied claim and evidence. Do not add "
+            "new facts, do not speculate, and do not use manipulative language. "
+            "Acknowledge uncertainty when verification status is needs_verification. "
+            "Use bracket citations like [1] that correspond to the supplied evidence."
+        )
+        user_prompt = self._build_llm_prompt(
+            verified_claim=verified_claim,
+            compiled=compiled,
+            tone=tone,
+            verdict=verdict,
+        )
+        generated = self.llm_client.generate(system_prompt=system_prompt, user_prompt=user_prompt)
+        return self.tone_adjuster.adjust(generated, tone=tone)
+
+    def _build_llm_prompt(self, *, verified_claim: Dict, compiled: Dict, tone: str, verdict: str) -> str:
+        evidence_lines = compiled["bullet_points"] or self.generate_evidence_summary(verified_claim.get("evidence", []))
+        bibliography = compiled["bibliography"] or []
+        return "\n".join(
+            [
+                f"Tone: {tone}",
+                f"Claim: {verified_claim.get('claim', '')}",
+                f"Claim type: {verified_claim.get('claim_type', 'unknown')}",
+                f"Verification status: {verified_claim.get('verification_status', 'needs_verification')}",
+                f"Credibility score: {verified_claim.get('credibility_score', 0)}",
+                f"Verdict to preserve: {verdict}",
+                "",
+                "Evidence:",
+                *evidence_lines,
+                "",
+                "Bibliography:",
+                *bibliography,
+                "",
+                "Write a 120-180 word counter-narrative with: context, evidence-based assessment, and a clear uncertainty note when needed.",
+            ]
+        )
 
     def generate_multiple_narratives(self, verified_claims: List[Dict], tone: str = "analytical") -> List[Dict]:
         """Generate counter-narratives for multiple claims."""
@@ -131,11 +228,16 @@ class NarrativeGenerator:
 
         high_conf = sum(1 for narrative in narratives if narrative["confidence"] == "high")
         disputed = sum(1 for narrative in narratives if narrative["verification_status"] == "disputed")
+        backend_counts = {}
+        for narrative in narratives:
+            backend = narrative.get("generation_backend", "template")
+            backend_counts[backend] = backend_counts.get(backend, 0) + 1
 
         report_lines.extend([
             "SUMMARY:",
             f"  High confidence narratives: {high_conf}",
             f"  Disputed claims addressed: {disputed}",
+            f"  Generation backends: {backend_counts}",
             "",
             "=" * 70,
             "COUNTER-NARRATIVES",

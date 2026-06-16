@@ -517,7 +517,7 @@ After running the pipeline:
 
 2\. \*\*Explore the data:\*\* Check JSON files for detailed analysis
 
-3\. \*\*Run with real data:\*\* Add real Twitter/Reddit APIs
+3\. \*\*Run with real data:\*\* Use NewsAPI/GDELT for live news and add exported public-comment datasets when available
 
 4\. \*\*Build Stage 4:\*\* Extract and verify claims from articles
 
